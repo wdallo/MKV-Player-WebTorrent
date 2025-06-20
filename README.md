@@ -36,7 +36,6 @@ This project is a Node.js/Express for streaming MKV/MP4 video files directly fro
 ## Usage
 - The server will automatically start downloading a sample torrent (see `torrentId` in `app.js`).
 - The browser UI will show a loading screen until the video is ready.
-- Once ready, you can select audio and subtitle tracks from dropdowns above the player.
 - Subtitles are rendered with full ASS support in the browser.
 
 ## Customization
