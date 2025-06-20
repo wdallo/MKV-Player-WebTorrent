@@ -1,6 +1,6 @@
 # WebTnode: Torrent Video Streaming
 
-This project is a Node.js/Express backend and modern browser frontend for streaming MKV/MP4 video files directly from torrents. It supports advanced browser-side subtitle rendering.
+This project is a Node.js/Express for streaming MKV/MP4 video files directly from torrents. It supports advanced browser-side subtitle rendering.
 
 ## Features
 
