@@ -1,11 +1,10 @@
-# WebTnode: Torrent Video Streaming with Multi-Track Support
+# WebTnode: Torrent Video Streaming
 
 This project is a Node.js/Express backend and modern browser frontend for streaming MKV/MP4 video files directly from torrents. It supports multiple audio and subtitle tracks, with advanced browser-side subtitle rendering.
 
 ## Features
 
 - **Stream MKV/MP4 from torrents** using WebTorrent.
-- **Select audio and subtitle tracks** dynamically in the browser.
 - **On-demand subtitle extraction** (ASS/SRT) using ffmpeg.
 - **Modern video player UI** with [Plyr](https://github.com/sampotts/plyr).
 - **ASS subtitle rendering** in-browser with [SubtitlesOctopus](https://github.com/CCExtractor/SubtitlesOctopus).
