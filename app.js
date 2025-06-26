@@ -593,11 +593,6 @@ app.get("/goodbye", (req, res) => {
   res.status(200).send("Torrent destroyed");
 });
 
-// Serve index.html for / and /index.html
-app.get(["/", "/index.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
-});
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
