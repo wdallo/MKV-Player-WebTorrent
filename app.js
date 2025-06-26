@@ -12,9 +12,323 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 // Enable CORS for all routes
 app.use(cors());
 
+// --- MULTI-MAGNET STATE ---
+const torrents = {}; // magnet -> { torrent, videoFile, videoMime, lastAccess }
+
+function getOrAddTorrent(magnet, cb) {
+  if (!magnet || !magnet.startsWith("magnet:")) return null;
+  if (torrents[magnet]) {
+    // Always re-select the first 1MB for streaming, even after refresh
+    const videoFile = torrents[magnet].videoFile;
+    if (videoFile) {
+      const end = Math.min(videoFile.length - 1, 1 * 1024 * 1024 - 1);
+      videoFile.select(0, end, false);
+    }
+    torrents[magnet].lastAccess = Date.now();
+    if (cb) cb(torrents[magnet].torrent);
+    return torrents[magnet];
+  }
+  torrents[magnet] = {
+    torrent: null,
+    videoFile: null,
+    videoMime: "video/mp4",
+    lastAccess: Date.now(),
+  };
+  torrents[magnet].torrent = client.add(magnet, (torrent) => {
+    const videoFile = torrent.files.find(
+      (f) => f.name.endsWith(".mp4") || f.name.endsWith(".mkv")
+    );
+    torrents[magnet].videoFile = videoFile;
+    torrents[magnet].videoMime =
+      videoFile && videoFile.name.endsWith(".mkv")
+        ? "video/x-matroska"
+        : "video/mp4";
+    // Prioritize downloading the first 1MB for streaming
+    if (videoFile) {
+      const end = Math.min(videoFile.length - 1, 1 * 1024 * 1024 - 1);
+      videoFile.select(0, end, false);
+    }
+    torrents[magnet].lastAccess = Date.now();
+    if (cb) cb(torrent);
+  });
+  return torrents[magnet];
+}
+
+// --- NEW: Torrent status endpoint ---
+app.get("/status", (req, res) => {
+  const magnet = req.query.url;
+  if (!magnet) return res.status(400).json({ error: "Missing url param" });
+  const state = getOrAddTorrent(magnet);
+  if (!state || !state.torrent) {
+    return res.status(404).json({ error: "Torrent not found" });
+  }
+  const t = state.torrent;
+  let status = "unknown";
+  if (!t.metadata) {
+    status = "fetching metadata";
+  } else if (t.numPeers === 0) {
+    status = "no peers";
+  } else if (t.downloaded === 0) {
+    status = "connecting";
+  } else if (t.done) {
+    status = "done";
+  } else {
+    status = "downloading";
+  }
+  res.json({
+    status,
+    infoHash: t.infoHash,
+    name: t.name,
+    ready: !!state.videoFile && state.videoFile.downloaded > 0,
+    downloaded: t.downloaded,
+    length: t.length,
+    progress: t.progress,
+    numPeers: t.numPeers,
+    timeRemaining: t.timeRemaining,
+    received: t.received,
+    downloadSpeed: t.downloadSpeed,
+    uploadSpeed: t.uploadSpeed,
+    error: t.error ? t.error.message : undefined,
+  });
+});
+
 // Example route
-app.get("/", (_, res) => {
-  res.send("Hello from Express with CORS!");
+// Route to get a simple player page, with video source set via query param (?src=/video)
+app.get("/player", (req, res) => {
+  const magnet = req.query.url;
+  if (!magnet || !magnet.startsWith("magnet:")) {
+    return res.status(400).send("Missing or invalid magnet url param");
+  }
+  // The video and subtitle endpoints will use the same ?url= param
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Video Player</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+        <style>
+          body { background: #181818; color: #fff; }
+          .plyr { margin: 40px auto; max-width: 800px; }
+          #loading { text-align: center; margin-top: 100px; font-size: 1.5em; }
+          #error { color: #ff5555; text-align: center; margin-top: 40px; }
+        </style>
+        <script src="/libs/subtitles-octopus.js"></script>
+      </head>
+      <body>
+        <div id="loading">Loading video and subtitles, please wait...</div>
+        <div id="status-msg" style="text-align:center; margin-top:10px; color:#aaa;"></div>
+        <div id="error" style="display:none"></div>
+        <video id="player" controls crossorigin playsinline width="800" style="background:#000; display:none;"></video>
+        <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+        <script>
+          // DOM debug helpers
+          function showStep(msg) {
+            let step = document.getElementById('step-debug');
+            if (!step) {
+              step = document.createElement('div');
+              step.id = 'step-debug';
+              step.style = 'color:yellow; background:#222; padding:8px; margin:10px 0; text-align:center;';
+              document.body.insertBefore(step, document.body.firstChild);
+            }
+            step.textContent = msg;
+          }
+          showStep('JS loaded');
+
+          const magnet = ${JSON.stringify(magnet)};
+          const video = document.getElementById('player');
+          const loading = document.getElementById('loading');
+          const errorDiv = document.getElementById('error');
+          const statusMsg = document.getElementById('status-msg');
+
+          // Show error if video fails to play
+          video.addEventListener('error', (e) => {
+            loading.style.display = 'none';
+            errorDiv.textContent = 'Video failed to load or is not playable.';
+            errorDiv.style.display = '';
+            showStep('Video error event');
+            console.error('Video error:', e);
+          });
+
+          // Hide loading when video is ready
+          video.addEventListener('canplay', () => {
+            loading.style.display = 'none';
+            video.style.display = '';
+            showStep('Video canplay event');
+            console.log('Video can play.');
+          });
+          video.addEventListener('loadeddata', () => {
+            loading.style.display = 'none';
+            video.style.display = '';
+            showStep('Video loadeddata event');
+            console.log('Video loaded data.');
+          });
+
+          // --- New: Poll /status for real-time torrent info ---
+          let lastStatus = '';
+          let noPeersSince = null;
+          let statusPollerActive = true;
+          async function pollStatus() {
+            while (statusPollerActive && loading.style.display !== 'none') {
+              try {
+                const res = await fetch('/status?url=' + encodeURIComponent(magnet));
+                if (res.ok) {
+                  const data = await res.json();
+                  let msg = '';
+                  if (data.status === 'fetching metadata') {
+                    msg = 'Fetching torrent metadata...';
+                  } else if (data.status === 'no peers') {
+                    msg = 'No seeds/peers found. Waiting...';
+                    if (!noPeersSince) noPeersSince = Date.now();
+                  } else if (data.status === 'connecting') {
+                    msg = 'Connecting to peers...';
+                  } else if (data.status === 'downloading') {
+                    var pct = (data.progress * 100).toFixed(1);
+                    var speed = (data.downloadSpeed / 1024).toFixed(1);
+                    msg = 'Downloading: ' + pct + '% at ' + speed + ' KB/s (' + data.numPeers + ' peers)';
+                    noPeersSince = null;
+                  } else if (data.status === 'done') {
+                    msg = 'Download complete!';
+                    noPeersSince = null;
+                  } else {
+                    msg = 'Status: ' + data.status;
+                  }
+                  // If stuck with no peers for >20s, show warning
+                  if (data.status === 'no peers' && noPeersSince && Date.now() - noPeersSince > 20000) {
+                    msg += ' <span style="color:#ff5555">No seeds found or torrent stalled. Try another torrent.</span>';
+                  }
+                  statusMsg.innerHTML = msg;
+                  lastStatus = data.status;
+                } else {
+                  statusMsg.textContent = 'Waiting for torrent status...';
+                }
+              } catch (e) {
+                statusMsg.textContent = 'Error fetching torrent status.';
+              }
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+
+          // Poll for video/subtitles readiness
+          async function pollUntilReady(url, isText) {
+            for (let i = 0; i < 120; ++i) { // up to ~60s
+              try {
+                const res = await fetch(url, { method: 'GET' });
+                if (res.status === 200) {
+                  return isText ? await res.text() : url;
+                }
+              } catch (e) {}
+              await new Promise(r => setTimeout(r, 500));
+            }
+            throw new Error('Timeout waiting for ' + url);
+          }
+
+          async function startPlayer() {
+            showStep('startPlayer() called');
+            statusPollerActive = true;
+            pollStatus(); // Start status polling
+            try {
+              // Wait for video and subtitles to be ready
+              const videoUrl = '/video?url=' + encodeURIComponent(magnet);
+              const subtitlesUrl = '/subtitles?url=' + encodeURIComponent(magnet);
+              const [videoSrc, ass] = await Promise.all([
+                pollUntilReady(videoUrl, false),
+                pollUntilReady(subtitlesUrl, true)
+              ]);
+              showStep('Video and subtitles are ready');
+              console.log('Video and subtitles are ready.');
+              video.src = videoSrc;
+              video.style.display = '';
+              video.load();
+              // Fallback: hide loading after 2s if video events don't fire
+              setTimeout(() => {
+                if (loading.style.display !== 'none') {
+                  loading.style.display = 'none';
+                  showStep('Fallback: hiding loading after timeout.');
+                  console.warn('Fallback: hiding loading after timeout.');
+                }
+              }, 2000);
+              const player = new Plyr(video, { captions: { active: true, update: true, language: 'en' } });
+              if (!ass || ass.indexOf('[Script Info]') === -1) {
+                // Try VTT fallback
+                showStep('No valid ASS subtitles found, trying VTT fallback');
+                try {
+                  const vttUrl = '/subtitles.vtt?url=' + encodeURIComponent(magnet);
+                  const vttRes = await fetch(vttUrl);
+                  if (vttRes.ok) {
+                    const vttText = await vttRes.text();
+                    if (vttText && vttText.startsWith('WEBVTT')) {
+                      // Remove any previous tracks
+                      while (video.firstChild) video.removeChild(video.firstChild);
+                      const track = document.createElement('track');
+                      track.kind = 'subtitles';
+                      track.label = 'English';
+                      track.srclang = 'en';
+                      track.default = true;
+                      // Create a Blob URL for the VTT
+                      const vttBlob = new Blob([vttText], { type: 'text/vtt' });
+                      track.src = URL.createObjectURL(vttBlob);
+                      video.appendChild(track);
+                      errorDiv.textContent = 'No valid ASS subtitles found. Using VTT fallback.';
+                      errorDiv.style.display = '';
+                      showStep('VTT fallback loaded');
+                    } else {
+                      errorDiv.textContent = 'No valid ASS or VTT subtitles found.';
+                      errorDiv.style.display = '';
+                      showStep('No valid ASS or VTT subtitles found');
+                    }
+                  } else {
+                    errorDiv.textContent = 'No valid ASS or VTT subtitles found.';
+                    errorDiv.style.display = '';
+                    showStep('No valid ASS or VTT subtitles found');
+                  }
+                } catch (e) {
+                  errorDiv.textContent = 'No valid ASS or VTT subtitles found.';
+                  errorDiv.style.display = '';
+                  showStep('No valid ASS or VTT subtitles found');
+                }
+                statusPollerActive = false;
+                return;
+              }
+              if (typeof window.SubtitlesOctopus === 'undefined') {
+                errorDiv.textContent = 'SubtitlesOctopus not loaded!';
+                errorDiv.style.display = '';
+                showStep('SubtitlesOctopus not loaded');
+                statusPollerActive = false;
+                return;
+              }
+              window.octopus = new window.SubtitlesOctopus({
+                video: video,
+                subContent: ass,
+                workerUrl: '/libs/subtitles-octopus-worker.js',
+                fonts: [],
+                fallbackFont: '/libs/ARIALBD.TTF',
+                renderMode: 'wasm-blend',
+                targetFps: 24
+              });
+              showStep('SubtitlesOctopus initialized');
+              console.log('SubtitlesOctopus initialized.');
+              statusPollerActive = false;
+              statusMsg.innerHTML = '';
+            } catch (err) {
+              loading.style.display = 'none';
+              errorDiv.textContent = 'Failed to load video or subtitles: ' + err.message;
+              errorDiv.style.display = '';
+              showStep('Player error: ' + err.message);
+              console.error('Player error:', err);
+              statusPollerActive = false;
+            }
+          }
+          startPlayer();
+
+          // Notify backend to destroy torrent on page close
+          window.addEventListener('unload', function() {
+            navigator.sendBeacon('/goodbye?url=' + encodeURIComponent(magnet));
+          });
+        </script>
+      </body>
+    </html>
+  `);
 });
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -31,26 +345,7 @@ const torrentId =
 let videoFile = null;
 let videoMime = "video/mp4";
 
-// Add error handler for WebTorrent client
-client.on("error", (err) => {
-  console.error("WebTorrent client error:", err);
-});
-
 client.add(torrentId, function (torrent) {
-  console.log("Torrent added successfully:", torrent.name);
-
-  // Add error handler for this specific torrent
-  torrent.on("error", (err) => {
-    console.error("Torrent error:", err);
-  });
-
-  torrent.on("ready", () => {
-    console.log("Torrent is ready. Files:");
-    torrent.files.forEach((file, index) => {
-      console.log(`  ${index}: ${file.name} (${file.length} bytes)`);
-    });
-  });
-
   // Find .mp4 or .mkv file
   videoFile = torrent.files.find(function (file) {
     return file.name.endsWith(".mp4") || file.name.endsWith(".mkv");
@@ -64,26 +359,33 @@ client.add(torrentId, function (torrent) {
     console.log(`Video file (${videoFile.name}) is ready to stream.`);
   } else {
     console.error("No .mp4 or .mkv file found in torrent.");
-    console.log("Available files:");
-    torrent.files.forEach((file, index) => {
-      console.log(`  ${index}: ${file.name}`);
-    });
   }
 });
 
 // Expose the file via an Express route, only if ready
 app.get("/video", (req, res) => {
-  if (!videoFile) {
+  const magnet = req.query.url;
+  if (!magnet) return res.status(400).send("Missing url param");
+  const state = getOrAddTorrent(magnet);
+  if (!state || !state.videoFile) {
     res.status(503).send("Video is not ready yet. Please try again later.");
     return;
   }
-
+  const videoFile = state.videoFile;
+  const videoMime = state.videoMime;
+  // Wait for at least 1MB to be downloaded before serving
+  const MIN_READY_BYTES = 1024 * 1024; // 1MB
+  if (videoFile.downloaded < MIN_READY_BYTES) {
+    console.log(
+      `[VIDEO] Not enough data: downloaded=${videoFile.downloaded} bytes, need at least ${MIN_READY_BYTES} bytes for ${videoFile.name}`
+    );
+    res.status(503).send("Video is not ready yet. Please try again later.");
+    return;
+  }
   const range = req.headers.range;
   const fileLength = videoFile.length;
-
   let stream;
   if (!range) {
-    // No range header, send the whole file
     res.setHeader("Content-Type", videoMime);
     res.setHeader("Content-Length", fileLength);
     stream = videoFile.createReadStream();
@@ -91,32 +393,26 @@ app.get("/video", (req, res) => {
       console.error("Stream error:", err);
       res.status(500).end("Stream error");
     });
-    // Handle client disconnect
     res.on("close", () => {
       stream.destroy();
     });
     stream.pipe(res);
     return;
   }
-
-  // Parse Range header (e.g., 'bytes=0-1023')
   const parts = range.replace(/bytes=/, "").split("-");
   const start = parseInt(parts[0], 10);
   const end = parts[1] ? parseInt(parts[1], 10) : fileLength - 1;
   const chunkSize = end - start + 1;
-
   res.status(206);
   res.setHeader("Content-Range", `bytes ${start}-${end}/${fileLength}`);
   res.setHeader("Accept-Ranges", "bytes");
   res.setHeader("Content-Length", chunkSize);
   res.setHeader("Content-Type", videoMime);
-
   stream = videoFile.createReadStream({ start, end });
   stream.on("error", (err) => {
     console.error("Stream error:", err);
     res.status(500).end("Stream error");
   });
-  // Handle client disconnect
   res.on("close", () => {
     stream.destroy();
   });
@@ -125,139 +421,176 @@ app.get("/video", (req, res) => {
 
 // Endpoint to extract and stream the first subtitle track as ASS using ffmpeg
 app.get("/subtitles", (req, res) => {
-  if (!videoFile) {
+  const magnet = req.query.url;
+  if (!magnet) return res.status(400).send("Missing url param");
+  const state = getOrAddTorrent(magnet);
+  if (!state || !state.videoFile) {
     res.status(503).send("Video is not ready yet. Please try again later.");
     return;
   }
-
-  console.log("Subtitle request received for file:", videoFile.name);
-
-  // Check if this is an MKV file (more likely to have embedded subs)
+  const videoFile = state.videoFile;
   if (!videoFile.name.endsWith(".mkv")) {
-    console.log("File is not MKV, sending empty ASS file");
-    // Send a minimal ASS file for non-MKV files
-    const emptyAss = `[Script Info]
-Title: No Subtitles
-ScriptType: v4.00+
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,No subtitles available`;
-
+    const emptyAss = `[Script Info]\nTitle: No Subtitles\nScriptType: v4.00+\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,No subtitles available`;
     res.setHeader("Content-Type", "text/x-ssa");
     res.send(emptyAss);
     return;
   }
-
-  // For MKV files, try to extract subtitles with better error handling
   res.setHeader("Content-Type", "text/x-ssa");
-
   let ffmpegCommand = null;
   let hasEnded = false;
-
   const sendFallbackSubtitles = (message = "Subtitle extraction failed") => {
     if (hasEnded) return;
     hasEnded = true;
-
-    const fallbackAss = `[Script Info]
-Title: ${message}
-ScriptType: v4.00+
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,${message}`;
-
+    const fallbackAss = `[Script Info]\nTitle: ${message}\nScriptType: v4.00+\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,${message}`;
     if (!res.headersSent) {
       res.send(fallbackAss);
     }
   };
-
   try {
-    // Use the video endpoint URL instead of direct stream to avoid issues
-    const videoUrl = `http://localhost:${process.env.PORT || 3000}/video`;
-
+    const videoUrl = `http://localhost:${
+      process.env.PORT || 3000
+    }/video?url=${encodeURIComponent(magnet)}`;
     ffmpegCommand = ffmpeg(videoUrl)
       .inputOptions(["-analyzeduration", "100M", "-probesize", "100M"])
-      .outputOptions([
-        "-map 0:s:0?", // Map first subtitle stream if it exists, ? makes it optional
-        "-f ass", // Output as ASS format
-      ])
-      .on("start", (commandLine) => {
-        console.log("FFmpeg command started:", commandLine);
-      })
-      .on("stderr", (stderrLine) => {
-        // Only log important stderr messages to reduce noise
-        if (
-          stderrLine.includes("error") ||
-          stderrLine.includes("Error") ||
-          stderrLine.includes("Stream")
-        ) {
-          console.log("FFmpeg stderr:", stderrLine);
-        }
-      })
+      .outputOptions(["-map 0:s:0?", "-f ass"])
       .on("error", (err) => {
-        console.error("ffmpeg error:", err.message);
-
-        // Don't treat SIGKILL as an error if the client disconnected
-        if (err.message.includes("SIGKILL") && hasEnded) {
-          console.log("FFmpeg was terminated due to client disconnect");
-          return;
-        }
-
         sendFallbackSubtitles("No subtitles found in video");
       })
       .on("end", () => {
-        if (!hasEnded) {
-          hasEnded = true;
-          console.log("FFmpeg subtitle extraction completed successfully");
-        }
+        hasEnded = true;
       });
-
-    // Handle client disconnect
     req.on("close", () => {
-      console.log("Client disconnected during subtitle extraction");
       hasEnded = true;
-      if (ffmpegCommand) {
-        ffmpegCommand.kill("SIGTERM"); // Use SIGTERM first, then SIGKILL if needed
-        setTimeout(() => {
-          if (ffmpegCommand) {
-            ffmpegCommand.kill("SIGKILL");
-          }
-        }, 5000);
-      }
+      if (ffmpegCommand) ffmpegCommand.kill("SIGTERM");
     });
-
-    // Set a timeout to prevent hanging
-    const timeout = setTimeout(() => {
-      console.log("Subtitle extraction timeout");
-      if (ffmpegCommand && !hasEnded) {
-        ffmpegCommand.kill("SIGTERM");
-        sendFallbackSubtitles("Subtitle extraction timed out");
-      }
-    }, 30000); // 30 second timeout
-
-    ffmpegCommand.on("end", () => {
-      clearTimeout(timeout);
-    });
-
-    ffmpegCommand.on("error", () => {
-      clearTimeout(timeout);
-    });
-
-    // Pipe the output to response
     ffmpegCommand.pipe(res, { end: true });
   } catch (error) {
-    console.error("Error setting up FFmpeg:", error);
     sendFallbackSubtitles("Failed to start subtitle extraction");
   }
+});
+
+// Endpoint to extract and stream the first subtitle track as VTT using ffmpeg or serve .vtt file directly from torrent or convert other subtitle formats
+app.get("/subtitles.vtt", (req, res) => {
+  const magnet = req.query.url;
+  if (!magnet) return res.status(400).send("Missing url param");
+  const state = getOrAddTorrent(magnet);
+  if (!state || !state.videoFile) {
+    res.status(503).send("Video is not ready yet. Please try again later.");
+    return;
+  }
+  const torrent = state.torrent;
+  // Try to find a .vtt file in the torrent
+  let vttFile = null;
+  let otherSubFile = null;
+  if (torrent && torrent.files) {
+    vttFile = torrent.files.find((f) => f.name.toLowerCase().endsWith(".vtt"));
+    if (!vttFile) {
+      // Look for other subtitle formats (srt, sub, ssa, txt, ass)
+      const subExts = [".srt", ".sub", ".ssa", ".txt", ".ass"];
+      otherSubFile = torrent.files.find((f) =>
+        subExts.some((ext) => f.name.toLowerCase().endsWith(ext))
+      );
+    }
+  }
+  if (vttFile) {
+    res.setHeader("Content-Type", "text/vtt");
+    const stream = vttFile.createReadStream();
+    stream.on("error", (err) => {
+      res.status(500).end("Error streaming VTT subtitle file");
+    });
+    res.on("close", () => {
+      stream.destroy();
+    });
+    stream.pipe(res);
+    return;
+  }
+  if (otherSubFile) {
+    // Convert to VTT using ffmpeg
+    res.setHeader("Content-Type", "text/vtt");
+    let ffmpegCommand = null;
+    let hasEnded = false;
+    const sendFallbackVtt = (message = "Subtitle conversion failed") => {
+      if (hasEnded) return;
+      hasEnded = true;
+      if (!res.headersSent) {
+        res.send("WEBVTT\n\nNOTE " + message);
+      }
+    };
+    try {
+      // Create a stream from the subtitle file
+      const subStream = otherSubFile.createReadStream();
+      ffmpegCommand = ffmpeg(subStream)
+        .inputFormat(null) // Let ffmpeg auto-detect
+        .outputOptions(["-f webvtt"])
+        .on("error", (err) => {
+          sendFallbackVtt("Subtitle conversion error");
+        })
+        .on("end", () => {
+          hasEnded = true;
+        });
+      req.on("close", () => {
+        hasEnded = true;
+        if (ffmpegCommand) ffmpegCommand.kill("SIGTERM");
+      });
+      ffmpegCommand.pipe(res, { end: true });
+    } catch (error) {
+      sendFallbackVtt("Failed to start subtitle conversion");
+    }
+    return;
+  }
+  // If no .vtt or other subtitle file, try ffmpeg extraction from first subtitle track in video
+  const videoFile = state.videoFile;
+  if (!videoFile.name.endsWith(".mkv")) {
+    // No VTT for non-mkv
+    res.setHeader("Content-Type", "text/vtt");
+    res.send("WEBVTT\n\nNOTE No subtitles available");
+    return;
+  }
+  res.setHeader("Content-Type", "text/vtt");
+  let ffmpegCommand = null;
+  let hasEnded = false;
+  const sendFallbackVtt = (message = "Subtitle extraction failed") => {
+    if (hasEnded) return;
+    hasEnded = true;
+    if (!res.headersSent) {
+      res.send("WEBVTT\n\nNOTE " + message);
+    }
+  };
+  try {
+    const videoUrl = `http://localhost:${
+      process.env.PORT || 3000
+    }/video?url=${encodeURIComponent(magnet)}`;
+    ffmpegCommand = ffmpeg(videoUrl)
+      .inputOptions(["-analyzeduration", "100M", "-probesize", "100M"])
+      .outputOptions(["-map 0:s:0?", "-f webvtt"])
+      .on("error", (err) => {
+        sendFallbackVtt("No subtitles found in video");
+      })
+      .on("end", () => {
+        hasEnded = true;
+      });
+    req.on("close", () => {
+      hasEnded = true;
+      if (ffmpegCommand) ffmpegCommand.kill("SIGTERM");
+    });
+    ffmpegCommand.pipe(res, { end: true });
+  } catch (error) {
+    sendFallbackVtt("Failed to start subtitle extraction");
+  }
+});
+
+// --- Destroy torrent on explicit goodbye ---
+app.get("/goodbye", (req, res) => {
+  const magnet = req.query.url;
+  if (!magnet || !torrents[magnet])
+    return res.status(200).send("No such torrent");
+  const state = torrents[magnet];
+  if (state.torrent) {
+    console.log(`[GOODBYE] Destroying torrent: ${magnet}`);
+    state.torrent.destroy();
+  }
+  delete torrents[magnet];
+  res.status(200).send("Torrent destroyed");
 });
 
 // Serve index.html for / and /index.html
