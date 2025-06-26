@@ -36,7 +36,6 @@ A Node.js/Express server for streaming MKV/MP4 video files directly from torrent
 ### File Structure
 
 - `app.js` — Express backend, WebTorrent integration, ffmpeg endpoints, multi-magnet logic, instant cleanup
-- `index.html` — (Optional) Static entry point
 - `/libs/` — Static assets for SubtitlesOctopus (JS, fonts)
 
 ## Usage
