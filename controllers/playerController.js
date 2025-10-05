@@ -215,9 +215,9 @@ export function renderPlayer(req, res) {
           }
           startPlayer();
 
-          window.addEventListener('unload', function() {
-            navigator.sendBeacon('/goodbye?url=' + encodeURIComponent(magnet));
-          });
+      window.addEventListener('pagehide', function() {
+  navigator.sendBeacon('/goodbye?url=' + encodeURIComponent(magnet));
+});
         </script>
       </body>
     </html>
