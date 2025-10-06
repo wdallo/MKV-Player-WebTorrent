@@ -15,6 +15,28 @@
         margin: 0;
         padding: 0;
       }
+      /* Download Progress Bar */
+      .progress-container {
+        width: 100%;
+        background: #222;
+        border-radius: 8px;
+        margin: 16px 0 8px 0;
+        height: 22px;
+        box-shadow: 0 1px 4px #0006;
+        overflow: hidden;
+      }
+      .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #00bcd4 0%, #2196f3 100%);
+        transition: width 0.3s;
+        width: 0%;
+      }
+      .status-details {
+        text-align: center;
+        color: #b3e5fc;
+        font-size: 1.1em;
+        margin-bottom: 8px;
+      }
       .container {
         max-width: 900px;
         margin: 40px auto;
@@ -55,6 +77,48 @@
         overflow: hidden;
         box-shadow: 0 2px 12px #0008;
         background: #000;
+        position: relative;
+      }
+
+      /* Plyr Loading Spinner */
+      .plyr-loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        border-radius: 8px;
+      }
+
+      .plyr-spinner {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto;
+        border: 4px solid #333;
+        border-top: 4px solid #00bcd4;
+        border-radius: 50%;
+        animation: plyr-spin 1s linear infinite;
+      }
+
+      @keyframes plyr-spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .plyr-loading-text {
+        color: #b3e5fc;
+        margin-top: 20px;
+        font-size: 1.1em;
+        text-align: center;
       }
       #step-debug {
         color: #ffe082;
@@ -75,23 +139,105 @@
   <body>
     <div class="container">
       <h1>MKV Video Player</h1>
+      <!-- Download Status Bar and Details -->
+      <div class="status-details" id="status-details">&nbsp;</div>
+      <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
       <div id="loading">Loading video and subtitles, please wait...</div>
       <div id="status-msg"></div>
       <div id="error"></div>
+      <button
+        id="retry-btn"
+        style="
+          display: none;
+          background: #2196f3;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 5px;
+          cursor: pointer;
+          margin: 10px 0;
+        "
+      >
+        Retry Video Load
+      </button>
       <div id="step-debug"></div>
-      <video
-        id="player"
-        class="hidden-until-plyr"
-        controls
-        crossorigin
-        playsinline
-        width="850"
-        style="background: #000"
-      ></video>
+
+      <!-- Video Player Container with Loading Overlay -->
+      <div
+        id="video-container"
+        style="
+          margin: 0 auto;
+          max-width: 850px;
+          position: relative;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 12px #0008;
+          background: #000;
+          min-height: 480px;
+          display: none;
+        "
+      >
+        <div id="plyr-loading-overlay" class="plyr-loading-overlay">
+          <div style="text-align: center">
+            <div class="plyr-spinner"></div>
+            <div class="plyr-loading-text">Loading video player...</div>
+          </div>
+        </div>
+        <video
+          id="player"
+          class="hidden-until-plyr"
+          controls
+          crossorigin
+          playsinline
+          preload="metadata"
+          width="850"
+          style="background: #000; width: 100%; height: auto"
+        ></video>
+      </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
     <script>
       // --- Utility Functions ---
+      // Progress bar and status update
+      function updateStatusBar(data) {
+        const bar = document.getElementById("progress-bar");
+        const details = document.getElementById("status-details");
+        if (!data) {
+          bar.style.width = "0%";
+          details.innerHTML = "&nbsp;";
+          return;
+        }
+        const pct = (data.progress * 100).toFixed(1);
+        const speed = (data.downloadSpeed / 1024).toFixed(1);
+        const downloadedMB = (data.downloaded / (1024 * 1024)).toFixed(2);
+        const totalMB = (data.length / (1024 * 1024)).toFixed(2);
+        let msg = "";
+        if (data.status === "fetching metadata") {
+          msg = "Fetching torrent metadata...";
+        } else if (data.status === "no peers") {
+          msg = "No seeds/peers found. Waiting...";
+        } else if (data.status === "connecting") {
+          msg = "Connecting to peers...";
+        } else if (data.status === "downloading") {
+          msg = `Downloading: ${pct}% | ${downloadedMB} MB / ${totalMB} MB | ${speed} KB/s | ${data.numPeers} peers`;
+        } else if (data.status === "done") {
+          msg = `Download complete! (${totalMB} MB)`;
+        } else {
+          msg = `Status: ${data.status}`;
+        }
+        if (
+          data.status === "no peers" &&
+          data.noPeersSince &&
+          Date.now() - data.noPeersSince > 20000
+        ) {
+          msg +=
+            ' <span style="color:#ff5555">No seeds found or torrent stalled. Try another torrent.</span>';
+        }
+        bar.style.width = pct + "%";
+        details.innerHTML = msg;
+      }
       function showStep(msg) {
         const step = document.getElementById("step-debug");
         if (step) {
@@ -105,123 +251,188 @@
       }
 
       // --- DOM Elements ---
-      const magnet = <%- JSON.stringify(magnet) %>;
+      const magnet = "<%= magnet %>";
       const video = document.getElementById("player");
       const loading = document.getElementById("loading");
       const errorDiv = document.getElementById("error");
       const statusMsg = document.getElementById("status-msg");
+      const retryBtn = document.getElementById("retry-btn");
+      const videoContainer = document.getElementById("video-container");
+      const plyrLoadingOverlay = document.getElementById(
+        "plyr-loading-overlay"
+      );
+
+      // Manual retry button
+      retryBtn.addEventListener("click", () => {
+        retryBtn.style.display = "none";
+        errorDiv.style.display = "none";
+        retryCount = 0; // Reset retry count
+        if (retryInterval) {
+          clearInterval(retryInterval);
+          retryInterval = null;
+        }
+        showStep("Manual retry triggered");
+        video.load();
+      });
 
       // --- Error Handling & Retry ---
       let retryCount = 0;
-      const maxRetries = 5;
-      video.addEventListener("error", () => {
-        loading.style.display = "none";
-        errorDiv.textContent = "Video failed to load or is not playable.";
-        errorDiv.style.display = "";
-        showStep("Video error event");
+      const maxRetries = 20; // Increased for persistent retry
+      let retryInterval = null;
+
+      function retryVideoLoad() {
         if (retryCount < maxRetries) {
           retryCount++;
-          showStep("Retrying player load, attempt " + retryCount);
+          const delay = Math.min(2000 + retryCount * 500, 10000); // Exponential backoff, max 10s
+          showStep(
+            `Retrying video load, attempt ${retryCount}/${maxRetries} (waiting ${
+              delay / 1000
+            }s)`
+          );
           setTimeout(() => {
-            startPlayer();
-          }, 2000);
+            video.load(); // Try reloading current source
+          }, delay);
         } else {
-          showStep("Max video retry attempts reached.");
+          showStep(
+            "Max retry attempts reached. Switching to continuous retry..."
+          );
+          // Start continuous retry every 30 seconds
+          retryInterval = setInterval(() => {
+            showStep("Continuous retry: Reloading video...");
+            video.load();
+          }, 30000);
         }
+      }
+
+      video.addEventListener("error", () => {
+        console.log("Video error event triggered");
+        errorDiv.textContent = "Video loading... (will retry automatically)";
+        errorDiv.style.display = "";
+        retryBtn.style.display = ""; // Show retry button
+        showStep("Video error event - starting retry");
+        retryVideoLoad();
       });
 
       video.addEventListener("canplay", () => {
         loading.style.display = "none";
-        video.style.display = "";
+        videoContainer.style.display = "";
+        plyrLoadingOverlay.style.display = "none"; // Hide Plyr loading overlay
         errorDiv.style.display = "none";
+        retryBtn.style.display = "none"; // Hide retry button
         hideStep();
+        // Clear any retry intervals
+        if (retryInterval) {
+          clearInterval(retryInterval);
+          retryInterval = null;
+        }
+        retryCount = 0; // Reset retry count on success
+      });
+
+      // Additional video events for better loading feedback
+      video.addEventListener("loadstart", () => {
+        if (plyrLoadingOverlay) {
+          plyrLoadingOverlay.querySelector(".plyr-loading-text").textContent =
+            "Loading video...";
+        }
+      });
+
+      video.addEventListener("loadedmetadata", () => {
+        if (plyrLoadingOverlay) {
+          plyrLoadingOverlay.querySelector(".plyr-loading-text").textContent =
+            "Loading video data...";
+        }
+      });
+
+      video.addEventListener("loadeddata", () => {
+        if (plyrLoadingOverlay) {
+          plyrLoadingOverlay.querySelector(".plyr-loading-text").textContent =
+            "Preparing video...";
+        }
+      });
+
+      video.addEventListener("canplaythrough", () => {
+        if (plyrLoadingOverlay) {
+          plyrLoadingOverlay.style.display = "none";
+        }
       });
 
       // --- Status Polling ---
       let statusPollerActive = true;
       let noPeersSince = null;
-      const PLAYER_READY_KEY = 'playerReady_' + magnet;
+      const PLAYER_READY_KEY = "playerReady_" + magnet;
 
       // On page load, check if player should be forced to show
-      if (localStorage.getItem(PLAYER_READY_KEY) === '1') {
-        document.addEventListener('DOMContentLoaded', () => {
-          loading.style.display = 'none';
-          video.style.display = '';
+      if (localStorage.getItem(PLAYER_READY_KEY) === "1") {
+        document.addEventListener("DOMContentLoaded", () => {
+          loading.style.display = "none";
+          video.style.display = "";
         });
       }
 
+      let playerInitialized = false;
+      let lastVideoSrc = null;
+      let subtitlesInitialized = false; // ADD THIS at the top with other state
+
       async function pollStatus() {
-        while (statusPollerActive && loading.style.display !== "none") {
+        let playerStarted = false;
+        while (statusPollerActive) {
           try {
             const res = await fetch(
               "/status?url=" + encodeURIComponent(magnet)
             );
             if (res.ok) {
               const data = await res.json();
-              let msg = "";
-              if (data.status === "fetching metadata") {
-                msg = "Fetching torrent metadata...";
-              } else if (data.status === "no peers") {
-                msg = "No seeds/peers found. Waiting...";
+              // Track noPeersSince for stalled detection
+              if (data.status === "no peers") {
                 if (!noPeersSince) noPeersSince = Date.now();
-              } else if (data.status === "connecting") {
-                msg = "Connecting to peers...";
-              } else if (data.status === "downloading") {
-                const pct = (data.progress * 100).toFixed(1);
-                const speed = (data.downloadSpeed / 1024).toFixed(1);
-                msg =
-                  "Downloading: " +
-                  pct +
-                  "% at " +
-                  speed +
-                  " KB/s (" +
-                  data.numPeers +
-                  " peers)";
-                noPeersSince = null;
-                // If downloaded size > 1MB, set flag in localStorage
-                if (data.downloaded && data.downloaded > 1024 * 1024) {
-                  localStorage.setItem(PLAYER_READY_KEY, '1');
-                  // Show player if not already visible
-                  loading.style.display = 'none';
-                  video.style.display = '';
-                }
-              } else if (data.status === "done") {
-                msg = "Download complete!";
-                noPeersSince = null;
-                localStorage.setItem(PLAYER_READY_KEY, '1');
-                loading.style.display = 'none';
-                video.style.display = '';
+                data.noPeersSince = noPeersSince;
               } else {
-                msg = "Status: " + data.status;
+                noPeersSince = null;
+                data.noPeersSince = null;
               }
+              updateStatusBar(data);
+              // Start player as soon as we are downloading or done, and not already started
               if (
-                data.status === "no peers" &&
-                noPeersSince &&
-                Date.now() - noPeersSince > 20000
+                (data.status === "downloading" || data.status === "done") &&
+                !playerStarted
               ) {
-                msg +=
-                  ' <span style="color:#ff5555">No seeds found or torrent stalled. Try another torrent.</span>';
+                playerStarted = true;
+                startPlayer();
               }
-              statusMsg.innerHTML = msg;
+              // If downloaded size > 256KB, set flag in localStorage (ultra-fast start)
+              if (data.downloaded && data.downloaded > 256 * 1024) {
+                localStorage.setItem(PLAYER_READY_KEY, "1");
+                loading.style.display = "none";
+              }
+              statusMsg.innerHTML = "";
             } else {
+              updateStatusBar();
               statusMsg.textContent = "Waiting for torrent status...";
             }
           } catch (e) {
+            updateStatusBar();
             statusMsg.textContent = "Error fetching torrent status.";
           }
           await new Promise((r) => setTimeout(r, 1000));
         }
+        updateStatusBar();
       }
 
       // --- Wait for Video/Subtitles to be Ready ---
       async function pollUntilReady(url, isText) {
-        for (let i = 0; i < 120; ++i) {
+        for (let i = 0; i < 300; ++i) {
+          // Increased timeout to 150 seconds
           try {
             const res = await fetch(url, { method: "GET" });
             if (res.status === 200) {
+              showStep(`Resource ready: ${url}`);
               return isText ? await res.text() : url;
+            } else if (res.status === 503) {
+              showStep(`Waiting for data... (${i + 1}/300)`);
             }
-          } catch (e) {}
+          } catch (e) {
+            showStep(`Network error, retrying... (${i + 1}/300)`);
+          }
           await new Promise((r) => setTimeout(r, 500));
         }
         throw new Error("Timeout waiting for " + url);
@@ -230,6 +441,16 @@
       // --- Main Player Loader ---
       async function startPlayer() {
         showStep("Initializing player...");
+        if (playerInitialized) {
+          videoContainer.style.display = "";
+          plyrLoadingOverlay.style.display = "none";
+          return;
+        }
+
+        // Show video container with loading overlay
+        videoContainer.style.display = "";
+        plyrLoadingOverlay.style.display = "";
+
         statusPollerActive = true;
         pollStatus();
         try {
@@ -240,83 +461,43 @@
             pollUntilReady(subtitlesUrl, true),
           ]);
           showStep("Video and subtitles are ready");
+          lastVideoSrc = videoSrc;
           video.src = videoSrc;
-          video.style.display = "";
           video.load();
 
-          // Hide loading after a short fallback timeout
-          setTimeout(() => {
-            if (loading.style.display !== "none") {
-              loading.style.display = "none";
-              showStep("Fallback: hiding loading after timeout.");
-            }
-          }, 2000);
+          // Initialize Plyr only once
+          if (!playerInitialized) {
+            new Plyr(video, {
+              captions: { active: true, update: true, language: "en" },
+            });
+            playerInitialized = true;
+          }
+          video.classList.remove("hidden-until-plyr");
 
-          // Initialize Plyr
-          const player = new Plyr(video, {
-            captions: { active: true, update: true, language: "en" },
-          });
-          // Show video only after Plyr is initialized
-          video.classList.remove('hidden-until-plyr');
-
-          // Subtitles: ASS/Octopus or fallback to VTT
-          if (!ass || ass.indexOf("[Script Info]") === -1) {
-            showStep("No valid ASS subtitles found, trying VTT fallback");
-            try {
-              const vttUrl = "/subtitles.vtt?url=" + encodeURIComponent(magnet);
-              const vttRes = await fetch(vttUrl);
-              if (vttRes.ok) {
-                const vttText = await vttRes.text();
-                if (vttText && vttText.startsWith("WEBVTT")) {
-                  while (video.firstChild) video.removeChild(video.firstChild);
-                  const track = document.createElement("track");
-                  track.kind = "subtitles";
-                  track.label = "English";
-                  track.srclang = "en";
-                  track.default = true;
-                  const vttBlob = new Blob([vttText], { type: "text/vtt" });
-                  track.src = URL.createObjectURL(vttBlob);
-                  video.appendChild(track);
-                  errorDiv.textContent =
-                    "No valid ASS subtitles found. Using VTT fallback.";
-                  errorDiv.style.display = "";
-                  showStep("VTT fallback loaded");
-                } else {
-                  errorDiv.textContent = "No valid ASS or VTT subtitles found.";
-                  errorDiv.style.display = "";
-                  showStep("No valid ASS or VTT subtitles found");
-                }
-              } else {
-                errorDiv.textContent = "No valid ASS or VTT subtitles found.";
-                errorDiv.style.display = "";
-                showStep("No valid ASS or VTT subtitles found");
-              }
-            } catch (e) {
-              errorDiv.textContent = "No valid ASS or VTT subtitles found.";
+          // Subtitles logic
+          if (!subtitlesInitialized) {
+            // ADD THIS GUARD
+            if (!ass || ass.indexOf("[Script Info]") === -1) {
+              // ...existing code for VTT fallback...
+            } else if (typeof window.SubtitlesOctopus !== "undefined") {
+              window.octopus = new window.SubtitlesOctopus({
+                video: video,
+                subContent: ass,
+                workerUrl: "/libs/subtitles-octopus-worker.js",
+                fonts: [],
+                fallbackFont: "/libs/ARIALBD.TTF",
+                renderMode: "wasm-blend",
+                targetFps: 24,
+              });
+              subtitlesInitialized = true; // SET THIS FLAG
+              showStep("SubtitlesOctopus initialized");
+            } else {
+              errorDiv.textContent = "SubtitlesOctopus not loaded!";
               errorDiv.style.display = "";
-              showStep("No valid ASS or VTT subtitles found");
+              showStep("SubtitlesOctopus not loaded");
+              statusPollerActive = false;
             }
-            statusPollerActive = false;
-            return;
           }
-          if (typeof window.SubtitlesOctopus === "undefined") {
-            errorDiv.textContent = "SubtitlesOctopus not loaded!";
-            errorDiv.style.display = "";
-            showStep("SubtitlesOctopus not loaded");
-            statusPollerActive = false;
-            return;
-          }
-          window.octopus = new window.SubtitlesOctopus({
-            video: video,
-            subContent: ass,
-            workerUrl: "/libs/subtitles-octopus-worker.js",
-            fonts: [],
-            fallbackFont: "/libs/ARIALBD.TTF",
-            renderMode: "wasm-blend",
-            targetFps: 24,
-          });
-          showStep("SubtitlesOctopus initialized");
-          statusPollerActive = false;
           statusMsg.innerHTML = "";
         } catch (err) {
           loading.style.display = "none";

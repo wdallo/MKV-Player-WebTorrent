@@ -36,7 +36,7 @@ export function streamAssSubtitles(req, res) {
       process.env.PORT || 3000
     }/video?url=${encodeURIComponent(magnet)}`;
     ffmpegCommand = ffmpeg(videoUrl)
-      .inputOptions(["-analyzeduration", "100M", "-probesize", "100M"])
+      .inputOptions(["-analyzeduration", "10M", "-probesize", "10M"])
       .outputOptions(["-map 0:s:0?", "-f ass"])
       .on("error", () => sendFallbackSubtitles("No subtitles found in video"))
       .on("end", () => {
@@ -136,7 +136,7 @@ export function streamVttSubtitles(req, res) {
       process.env.PORT || 3000
     }/video?url=${encodeURIComponent(magnet)}`;
     ffmpegCommand = ffmpeg(videoUrl)
-      .inputOptions(["-analyzeduration", "100M", "-probesize", "100M"])
+      .inputOptions(["-analyzeduration", "10M", "-probesize", "10M"])
       .outputOptions(["-map 0:s:0?", "-f webvtt"])
       .on("error", () => {
         sendFallbackVtt("No subtitles found in video");

@@ -1,7 +1,8 @@
 // Video streaming controller
 import { getOrAddTorrent } from "../services/torrentService.js";
 
-const MIN_READY_BYTES = 1 * 1024 * 1024; // 1MB
+const MIN_READY_BYTES = 256 * 1024; // 256KB for ultra-fast start
+const PRIORITY_PIECES = 20; // Download first 20 pieces with priority
 
 export function streamVideo(req, res) {
   const magnet = req.query.url;
@@ -18,15 +19,29 @@ export function streamVideo(req, res) {
   }
   const videoFile = state.videoFile;
   const videoMime = state.videoMime;
+
+  // Set priority for first pieces (contains MKV metadata)
+  if (videoFile._torrent) {
+    // Download first 10 pieces with highest priority
+    for (
+      let i = 0;
+      i < Math.min(PRIORITY_PIECES, videoFile._torrent.pieces.length);
+      i++
+    ) {
+      videoFile._torrent.select(i, i, true); // High priority
+    }
+    // Also prioritize the video file specifically
+    videoFile._torrent.select(videoFile._startPiece, videoFile._endPiece, true);
+  }
   const firstPiece = videoFile._startPiece || 0;
   const firstPieceDownloaded =
     videoFile._torrent && videoFile._torrent.bitfield
       ? videoFile._torrent.bitfield.get(firstPiece)
       : false;
-  // If more than 1MB is downloaded (e.g. after refresh), allow streaming regardless of first piece
-  if (videoFile.downloaded >= 1024 * 1024) {
+  // If more than 256KB is downloaded, allow streaming
+  if (videoFile.downloaded >= MIN_READY_BYTES) {
     console.log(
-      `[VIDEO] Allowing stream: downloaded=${videoFile.downloaded} bytes (>1MB)`
+      `[VIDEO] Allowing stream: downloaded=${videoFile.downloaded} bytes (>256KB)`
     );
   } else if (videoFile.downloaded < MIN_READY_BYTES || !firstPieceDownloaded) {
     console.log(
@@ -39,13 +54,22 @@ export function streamVideo(req, res) {
   const range = req.headers.range;
   const fileLength = videoFile.length;
   let stream;
+  // Helper: get last downloaded byte
+  const lastDownloadedByte = videoFile.downloaded - 1;
   if (!range) {
+    // Only serve up to downloaded bytes
+    const end = Math.min(fileLength - 1, lastDownloadedByte);
+    if (end < 0) {
+      res.status(416).send("No data available yet");
+      return;
+    }
+    const chunkSize = end + 1;
     console.log(
-      `[VIDEO] No range header. Sending full file: ${videoFile.name} (${fileLength} bytes)`
+      `[VIDEO] No range header. Sending downloaded part: 0-${end} (${chunkSize} bytes) of ${videoFile.name}`
     );
     res.setHeader("Content-Type", videoMime);
-    res.setHeader("Content-Length", fileLength);
-    stream = videoFile.createReadStream();
+    res.setHeader("Content-Length", chunkSize);
+    stream = videoFile.createReadStream({ start: 0, end });
     stream.on("error", (err) => {
       console.error("[VIDEO] Stream error (no range):", err);
       res.status(500).end("Stream error");
@@ -58,7 +82,14 @@ export function streamVideo(req, res) {
   }
   const parts = range.replace(/bytes=/, "").split("-");
   const start = parseInt(parts[0], 10);
-  const end = parts[1] ? parseInt(parts[1], 10) : fileLength - 1;
+  let end = parts[1] ? parseInt(parts[1], 10) : fileLength - 1;
+  // Only serve up to downloaded bytes
+  if (start > lastDownloadedByte) {
+    res.status(416).setHeader("Content-Range", `bytes */${fileLength}`);
+    res.end();
+    return;
+  }
+  end = Math.min(end, lastDownloadedByte);
   const chunkSize = end - start + 1;
   console.log(
     `[VIDEO] Range request: ${start}-${end} (${chunkSize} bytes) for ${videoFile.name}`

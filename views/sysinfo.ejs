@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>System Info</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 2em;
+      }
+      table {
+        border-collapse: collapse;
+        width: 50%;
+      }
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 8px;
+      }
+      th {
+        background: #f4f4f4;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>System Information</h1>
+    <table>
+      <tr>
+        <th>PID</th>
+        <td><%= pid %></td>
+      </tr>
+      <tr>
+        <th>Platform</th>
+        <td><%= platform %></td>
+      </tr>
+      <tr>
+        <th>Node Version</th>
+        <td><%= nodeVersion %></td>
+      </tr>
+      <tr>
+        <th>Uptime (seconds)</th>
+        <td><%= uptime %></td>
+      </tr>
+    </table>
+
+    <h2>Memory Usage</h2>
+    <table>
+      <tr>
+        <th>Type</th>
+        <th>Bytes</th>
+      </tr>
+      <tr>
+        <td>RSS</td>
+        <td><%= memory.rss %></td>
+      </tr>
+      <tr>
+        <td>Heap Total</td>
+        <td><%= memory.heapTotal %></td>
+      </tr>
+      <tr>
+        <td>Heap Used</td>
+        <td><%= memory.heapUsed %></td>
+      </tr>
+      <tr>
+        <td>External</td>
+        <td><%= memory.external %></td>
+      </tr>
+      <tr>
+        <td>Array Buffers</td>
+        <td><%= memory.arrayBuffers %></td>
+      </tr>
+    </table>
+
+    <h2>CPU Usage</h2>
+    <table>
+      <tr>
+        <th>User</th>
+        <td><%= cpu.user %></td>
+      </tr>
+      <tr>
+        <th>System</th>
+        <td><%= cpu.system %></td>
+      </tr>
+    </table>
+  </body>
+</html>

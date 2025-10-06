@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "MKV-Player With subtitles reading (.ass) streaming via torrent magnet",
   "dependencies": {
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "ejs": "^3.1.10",
     "express": "^5.1.0",

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -13,6 +14,7 @@ import { destroyTorrent } from "./services/torrentService.js";
 
 const app = express();
 app.use(cors());
+app.use(compression());
 
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -28,6 +30,19 @@ app.use(playerRoutes);
 app.use(videoRoutes);
 app.use(statusRoutes);
 app.use(subtitleRoutes);
+
+app.get("/sysinfo", (req, res) => {
+  const mem = process.memoryUsage();
+  const cpu = process.cpuUsage();
+  res.render("sysinfo", {
+    memory: mem,
+    cpu: cpu,
+    uptime: process.uptime(),
+    pid: process.pid,
+    platform: process.platform,
+    nodeVersion: process.version,
+  });
+});
 
 const rm = promisify(fs.rm);
 
