@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MKV Video Player</title>
+    <meta name="viewport" content="width=900, initial-scale=1" />
+
+    <link rel="preload" as="style" href="/libs/plyr.css" />
+    <link rel="stylesheet" href="/libs/plyr.css" />
+    <style>
+      body {
+        background: #181818;
+        color: #fff;
+        font-family: "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 900px;
+        margin: 40px auto;
+        background: #222;
+        border-radius: 12px;
+        box-shadow: 0 4px 24px #000a;
+        padding: 32px 24px 24px 24px;
+      }
+      h1 {
+        text-align: center;
+        font-weight: 400;
+        margin-bottom: 16px;
+        letter-spacing: 1px;
+      }
+      #loading {
+        text-align: center;
+        margin: 60px 0 20px 0;
+        font-size: 1.4em;
+        color: #b3e5fc;
+      }
+      #status-msg {
+        text-align: center;
+        margin: 10px 0 20px 0;
+        color: #aaa;
+        font-size: 1em;
+      }
+      #error {
+        color: #ff5555;
+        text-align: center;
+        margin: 30px 0 0 0;
+        font-size: 1.1em;
+        display: none;
+      }
+      .plyr {
+        margin: 0 auto;
+        max-width: 850px;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px #0008;
+        background: #000;
+      }
+      #step-debug {
+        color: #ffe082;
+        background: #333;
+        padding: 8px;
+        margin: 16px 0 0 0;
+        text-align: center;
+        border-radius: 6px;
+        font-size: 0.95em;
+        display: none;
+      }
+      .hidden-until-plyr {
+        visibility: hidden;
+      }
+    </style>
+    <script src="/libs/subtitles-octopus.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>MKV Video Player</h1>
+      <div id="loading">Loading video and subtitles, please wait...</div>
+      <div id="status-msg"></div>
+      <div id="error"></div>
+      <div id="step-debug"></div>
+      <video
+        id="player"
+        class="hidden-until-plyr"
+        controls
+        crossorigin
+        playsinline
+        width="850"
+        style="background: #000"
+      ></video>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+    <script>
+      // --- Utility Functions ---
+      function showStep(msg) {
+        const step = document.getElementById("step-debug");
+        if (step) {
+          step.textContent = msg;
+          step.style.display = "";
+        }
+      }
+      function hideStep() {
+        const step = document.getElementById("step-debug");
+        if (step) step.style.display = "none";
+      }
+
+      // --- DOM Elements ---
+      const magnet = <%- JSON.stringify(magnet) %>;
+      const video = document.getElementById("player");
+      const loading = document.getElementById("loading");
+      const errorDiv = document.getElementById("error");
+      const statusMsg = document.getElementById("status-msg");
+
+      // --- Error Handling & Retry ---
+      let retryCount = 0;
+      const maxRetries = 5;
+      video.addEventListener("error", () => {
+        loading.style.display = "none";
+        errorDiv.textContent = "Video failed to load or is not playable.";
+        errorDiv.style.display = "";
+        showStep("Video error event");
+        if (retryCount < maxRetries) {
+          retryCount++;
+          showStep("Retrying player load, attempt " + retryCount);
+          setTimeout(() => {
+            startPlayer();
+          }, 2000);
+        } else {
+          showStep("Max video retry attempts reached.");
+        }
+      });
+
+      video.addEventListener("canplay", () => {
+        loading.style.display = "none";
+        video.style.display = "";
+        errorDiv.style.display = "none";
+        hideStep();
+      });
+
+      // --- Status Polling ---
+      let statusPollerActive = true;
+      let noPeersSince = null;
+      const PLAYER_READY_KEY = 'playerReady_' + magnet;
+
+      // On page load, check if player should be forced to show
+      if (localStorage.getItem(PLAYER_READY_KEY) === '1') {
+        document.addEventListener('DOMContentLoaded', () => {
+          loading.style.display = 'none';
+          video.style.display = '';
+        });
+      }
+
+      async function pollStatus() {
+        while (statusPollerActive && loading.style.display !== "none") {
+          try {
+            const res = await fetch(
+              "/status?url=" + encodeURIComponent(magnet)
+            );
+            if (res.ok) {
+              const data = await res.json();
+              let msg = "";
+              if (data.status === "fetching metadata") {
+                msg = "Fetching torrent metadata...";
+              } else if (data.status === "no peers") {
+                msg = "No seeds/peers found. Waiting...";
+                if (!noPeersSince) noPeersSince = Date.now();
+              } else if (data.status === "connecting") {
+                msg = "Connecting to peers...";
+              } else if (data.status === "downloading") {
+                const pct = (data.progress * 100).toFixed(1);
+                const speed = (data.downloadSpeed / 1024).toFixed(1);
+                msg =
+                  "Downloading: " +
+                  pct +
+                  "% at " +
+                  speed +
+                  " KB/s (" +
+                  data.numPeers +
+                  " peers)";
+                noPeersSince = null;
+                // If downloaded size > 1MB, set flag in localStorage
+                if (data.downloaded && data.downloaded > 1024 * 1024) {
+                  localStorage.setItem(PLAYER_READY_KEY, '1');
+                  // Show player if not already visible
+                  loading.style.display = 'none';
+                  video.style.display = '';
+                }
+              } else if (data.status === "done") {
+                msg = "Download complete!";
+                noPeersSince = null;
+                localStorage.setItem(PLAYER_READY_KEY, '1');
+                loading.style.display = 'none';
+                video.style.display = '';
+              } else {
+                msg = "Status: " + data.status;
+              }
+              if (
+                data.status === "no peers" &&
+                noPeersSince &&
+                Date.now() - noPeersSince > 20000
+              ) {
+                msg +=
+                  ' <span style="color:#ff5555">No seeds found or torrent stalled. Try another torrent.</span>';
+              }
+              statusMsg.innerHTML = msg;
+            } else {
+              statusMsg.textContent = "Waiting for torrent status...";
+            }
+          } catch (e) {
+            statusMsg.textContent = "Error fetching torrent status.";
+          }
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+
+      // --- Wait for Video/Subtitles to be Ready ---
+      async function pollUntilReady(url, isText) {
+        for (let i = 0; i < 120; ++i) {
+          try {
+            const res = await fetch(url, { method: "GET" });
+            if (res.status === 200) {
+              return isText ? await res.text() : url;
+            }
+          } catch (e) {}
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        throw new Error("Timeout waiting for " + url);
+      }
+
+      // --- Main Player Loader ---
+      async function startPlayer() {
+        showStep("Initializing player...");
+        statusPollerActive = true;
+        pollStatus();
+        try {
+          const videoUrl = "/video?url=" + encodeURIComponent(magnet);
+          const subtitlesUrl = "/subtitles?url=" + encodeURIComponent(magnet);
+          const [videoSrc, ass] = await Promise.all([
+            pollUntilReady(videoUrl, false),
+            pollUntilReady(subtitlesUrl, true),
+          ]);
+          showStep("Video and subtitles are ready");
+          video.src = videoSrc;
+          video.style.display = "";
+          video.load();
+
+          // Hide loading after a short fallback timeout
+          setTimeout(() => {
+            if (loading.style.display !== "none") {
+              loading.style.display = "none";
+              showStep("Fallback: hiding loading after timeout.");
+            }
+          }, 2000);
+
+          // Initialize Plyr
+          const player = new Plyr(video, {
+            captions: { active: true, update: true, language: "en" },
+          });
+          // Show video only after Plyr is initialized
+          video.classList.remove('hidden-until-plyr');
+
+          // Subtitles: ASS/Octopus or fallback to VTT
+          if (!ass || ass.indexOf("[Script Info]") === -1) {
+            showStep("No valid ASS subtitles found, trying VTT fallback");
+            try {
+              const vttUrl = "/subtitles.vtt?url=" + encodeURIComponent(magnet);
+              const vttRes = await fetch(vttUrl);
+              if (vttRes.ok) {
+                const vttText = await vttRes.text();
+                if (vttText && vttText.startsWith("WEBVTT")) {
+                  while (video.firstChild) video.removeChild(video.firstChild);
+                  const track = document.createElement("track");
+                  track.kind = "subtitles";
+                  track.label = "English";
+                  track.srclang = "en";
+                  track.default = true;
+                  const vttBlob = new Blob([vttText], { type: "text/vtt" });
+                  track.src = URL.createObjectURL(vttBlob);
+                  video.appendChild(track);
+                  errorDiv.textContent =
+                    "No valid ASS subtitles found. Using VTT fallback.";
+                  errorDiv.style.display = "";
+                  showStep("VTT fallback loaded");
+                } else {
+                  errorDiv.textContent = "No valid ASS or VTT subtitles found.";
+                  errorDiv.style.display = "";
+                  showStep("No valid ASS or VTT subtitles found");
+                }
+              } else {
+                errorDiv.textContent = "No valid ASS or VTT subtitles found.";
+                errorDiv.style.display = "";
+                showStep("No valid ASS or VTT subtitles found");
+              }
+            } catch (e) {
+              errorDiv.textContent = "No valid ASS or VTT subtitles found.";
+              errorDiv.style.display = "";
+              showStep("No valid ASS or VTT subtitles found");
+            }
+            statusPollerActive = false;
+            return;
+          }
+          if (typeof window.SubtitlesOctopus === "undefined") {
+            errorDiv.textContent = "SubtitlesOctopus not loaded!";
+            errorDiv.style.display = "";
+            showStep("SubtitlesOctopus not loaded");
+            statusPollerActive = false;
+            return;
+          }
+          window.octopus = new window.SubtitlesOctopus({
+            video: video,
+            subContent: ass,
+            workerUrl: "/libs/subtitles-octopus-worker.js",
+            fonts: [],
+            fallbackFont: "/libs/ARIALBD.TTF",
+            renderMode: "wasm-blend",
+            targetFps: 24,
+          });
+          showStep("SubtitlesOctopus initialized");
+          statusPollerActive = false;
+          statusMsg.innerHTML = "";
+        } catch (err) {
+          loading.style.display = "none";
+          errorDiv.textContent =
+            "Failed to load video or subtitles: " + err.message;
+          errorDiv.style.display = "";
+          showStep("Player error: " + err.message);
+          statusPollerActive = false;
+        }
+      }
+      startPlayer();
+
+      // --- Cleanup on Leave ---
+      window.addEventListener("pagehide", function () {
+        navigator.sendBeacon("/goodbye?url=" + encodeURIComponent(magnet));
+      });
+    </script>
+  </body>
+</html>
