@@ -6,69 +6,134 @@ export function renderPlayer(req, res) {
   }
   res.send(`
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
       <head>
         <meta charset="utf-8">
-        <title>Video Player</title>
+        <title>MKV Video Player</title>
+        <meta name="viewport" content="width=900, initial-scale=1">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
         <style>
-          body { background: #181818; color: #fff; }
-          .plyr { margin: 40px auto; max-width: 800px; }
-          #loading { text-align: center; margin-top: 100px; font-size: 1.5em; }
-          #error { color: #ff5555; text-align: center; margin-top: 40px; }
+          body {
+            background: #181818;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #222;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px #000a;
+            padding: 32px 24px 24px 24px;
+          }
+          h1 {
+            text-align: center;
+            font-weight: 400;
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+          }
+          #loading {
+            text-align: center;
+            margin: 60px 0 20px 0;
+            font-size: 1.4em;
+            color: #b3e5fc;
+          }
+          #status-msg {
+            text-align: center;
+            margin: 10px 0 20px 0;
+            color: #aaa;
+            font-size: 1em;
+          }
+          #error {
+            color: #ff5555;
+            text-align: center;
+            margin: 30px 0 0 0;
+            font-size: 1.1em;
+            display: none;
+          }
+          .plyr {
+            margin: 0 auto;
+            max-width: 850px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px #0008;
+            background: #000;
+          }
+          #step-debug {
+            color: #ffe082;
+            background: #333;
+            padding: 8px;
+            margin: 16px 0 0 0;
+            text-align: center;
+            border-radius: 6px;
+            font-size: 0.95em;
+            display: none;
+          }
         </style>
         <script src="/libs/subtitles-octopus.js"></script>
       </head>
       <body>
-        <div id="loading">Loading video and subtitles, please wait...</div>
-        <div id="status-msg" style="text-align:center; margin-top:10px; color:#aaa;"></div>
-        <div id="error" style="display:none"></div>
-        <video id="player" controls crossorigin playsinline width="800" style="background:#000; display:none;"></video>
+        <div class="container">
+          <h1>MKV Video Player</h1>
+          <div id="loading">Loading video and subtitles, please wait...</div>
+          <div id="status-msg"></div>
+          <div id="error"></div>
+          <div id="step-debug"></div>
+          <video id="player" controls crossorigin playsinline width="850" style="display:none; background:#000;"></video>
+        </div>
         <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
         <script>
-          // ...existing code for player JS...
+          // --- Utility Functions ---
           function showStep(msg) {
-            let step = document.getElementById('step-debug');
-            if (!step) {
-              step = document.createElement('div');
-              step.id = 'step-debug';
-              step.style = 'color:yellow; background:#222; padding:8px; margin:10px 0; text-align:center;';
-              document.body.insertBefore(step, document.body.firstChild);
+            const step = document.getElementById('step-debug');
+            if (step) {
+              step.textContent = msg;
+              step.style.display = '';
             }
-            step.textContent = msg;
           }
-          showStep('JS loaded');
+          function hideStep() {
+            const step = document.getElementById('step-debug');
+            if (step) step.style.display = 'none';
+          }
 
+          // --- DOM Elements ---
           const magnet = ${JSON.stringify(magnet)};
           const video = document.getElementById('player');
           const loading = document.getElementById('loading');
           const errorDiv = document.getElementById('error');
           const statusMsg = document.getElementById('status-msg');
 
-          video.addEventListener('error', (e) => {
+          // --- Error Handling & Retry ---
+          let retryCount = 0;
+          const maxRetries = 5;
+          video.addEventListener('error', () => {
             loading.style.display = 'none';
             errorDiv.textContent = 'Video failed to load or is not playable.';
             errorDiv.style.display = '';
             showStep('Video error event');
-            console.error('Video error:', e);
+            if (retryCount < maxRetries) {
+              retryCount++;
+              showStep('Retrying player load, attempt ' + retryCount);
+              setTimeout(() => {
+                startPlayer();
+              }, 2000);
+            } else {
+              showStep('Max video retry attempts reached.');
+            }
           });
 
           video.addEventListener('canplay', () => {
             loading.style.display = 'none';
             video.style.display = '';
-            showStep('Video canplay event');
-            console.log('Video can play.');
-          });
-          video.addEventListener('loadeddata', () => {
-            loading.style.display = 'none';
-            video.style.display = '';
-            showStep('Video loadeddata event');
-            console.log('Video loaded data.');
+            errorDiv.style.display = 'none';
+            hideStep();
           });
 
-          let lastStatus = '';
-          let noPeersSince = null;
+          // --- Status Polling ---
           let statusPollerActive = true;
+          let noPeersSince = null;
           async function pollStatus() {
             while (statusPollerActive && loading.style.display !== 'none') {
               try {
@@ -84,8 +149,8 @@ export function renderPlayer(req, res) {
                   } else if (data.status === 'connecting') {
                     msg = 'Connecting to peers...';
                   } else if (data.status === 'downloading') {
-                    var pct = (data.progress * 100).toFixed(1);
-                    var speed = (data.downloadSpeed / 1024).toFixed(1);
+                    const pct = (data.progress * 100).toFixed(1);
+                    const speed = (data.downloadSpeed / 1024).toFixed(1);
                     msg = 'Downloading: ' + pct + '% at ' + speed + ' KB/s (' + data.numPeers + ' peers)';
                     noPeersSince = null;
                   } else if (data.status === 'done') {
@@ -98,7 +163,6 @@ export function renderPlayer(req, res) {
                     msg += ' <span style="color:#ff5555">No seeds found or torrent stalled. Try another torrent.</span>';
                   }
                   statusMsg.innerHTML = msg;
-                  lastStatus = data.status;
                 } else {
                   statusMsg.textContent = 'Waiting for torrent status...';
                 }
@@ -109,6 +173,7 @@ export function renderPlayer(req, res) {
             }
           }
 
+          // --- Wait for Video/Subtitles to be Ready ---
           async function pollUntilReady(url, isText) {
             for (let i = 0; i < 120; ++i) {
               try {
@@ -122,8 +187,9 @@ export function renderPlayer(req, res) {
             throw new Error('Timeout waiting for ' + url);
           }
 
+          // --- Main Player Loader ---
           async function startPlayer() {
-            showStep('startPlayer() called');
+            showStep('Initializing player...');
             statusPollerActive = true;
             pollStatus();
             try {
@@ -134,18 +200,22 @@ export function renderPlayer(req, res) {
                 pollUntilReady(subtitlesUrl, true)
               ]);
               showStep('Video and subtitles are ready');
-              console.log('Video and subtitles are ready.');
               video.src = videoSrc;
               video.style.display = '';
               video.load();
+
+              // Hide loading after a short fallback timeout
               setTimeout(() => {
                 if (loading.style.display !== 'none') {
                   loading.style.display = 'none';
                   showStep('Fallback: hiding loading after timeout.');
-                  console.warn('Fallback: hiding loading after timeout.');
                 }
               }, 2000);
+
+              // Initialize Plyr
               const player = new Plyr(video, { captions: { active: true, update: true, language: 'en' } });
+
+              // Subtitles: ASS/Octopus or fallback to VTT
               if (!ass || ass.indexOf('[Script Info]') === -1) {
                 showStep('No valid ASS subtitles found, trying VTT fallback');
                 try {
@@ -201,7 +271,6 @@ export function renderPlayer(req, res) {
                 targetFps: 24
               });
               showStep('SubtitlesOctopus initialized');
-              console.log('SubtitlesOctopus initialized.');
               statusPollerActive = false;
               statusMsg.innerHTML = '';
             } catch (err) {
@@ -209,15 +278,15 @@ export function renderPlayer(req, res) {
               errorDiv.textContent = 'Failed to load video or subtitles: ' + err.message;
               errorDiv.style.display = '';
               showStep('Player error: ' + err.message);
-              console.error('Player error:', err);
               statusPollerActive = false;
             }
           }
           startPlayer();
 
-      window.addEventListener('pagehide', function() {
-  navigator.sendBeacon('/goodbye?url=' + encodeURIComponent(magnet));
-});
+          // --- Cleanup on Leave ---
+          window.addEventListener('pagehide', function() {
+            navigator.sendBeacon('/goodbye?url=' + encodeURIComponent(magnet));
+          });
         </script>
       </body>
     </html>

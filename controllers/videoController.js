@@ -1,7 +1,7 @@
 // Video streaming controller
 import { getOrAddTorrent } from "../services/torrentService.js";
 
-const MIN_READY_BYTES = 5 * 1024 * 1024; // 5MB
+const MIN_READY_BYTES = 1 * 1024 * 1024; // 1MB
 
 export function streamVideo(req, res) {
   const magnet = req.query.url;
@@ -69,11 +69,19 @@ export function streamVideo(req, res) {
   res.setHeader("Content-Length", chunkSize);
   res.setHeader("Content-Type", videoMime);
   stream = videoFile.createReadStream({ start, end });
+  console.log(`[VIDEO] Stream created for range: ${start}-${end}`);
   stream.on("error", (err) => {
     console.error("[VIDEO] Stream error (range):", err);
     res.status(500).end("Stream error");
   });
+  stream.on("end", () => {
+    console.log("[VIDEO] Stream ended (range)");
+  });
+  stream.on("close", () => {
+    console.log("[VIDEO] Stream closed (range)");
+  });
   res.on("close", () => {
+    console.log("[VIDEO] Response closed by client");
     stream.destroy();
   });
   stream.pipe(res);
