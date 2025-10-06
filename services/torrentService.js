@@ -8,7 +8,7 @@ import fs from "fs";
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DOWNLOAD_DIR = path.join(__dirname, "../etc");
+const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
 
 // Watch for file deletions in the download directory
 try {
