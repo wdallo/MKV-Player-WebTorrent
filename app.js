@@ -19,6 +19,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(__dirname));
 
+// Set EJS as the view engine
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
 // Mount routes
 app.use(playerRoutes);
 app.use(videoRoutes);
