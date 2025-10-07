@@ -330,10 +330,14 @@ class SubtitlesManager {
     this.videoElement = videoElement;
     this.initialized = false;
     this.octopus = null;
+    this.lastSubtitleContent = "";
+    this.pollInterval = null;
+    this.subtitlesUrl = null;
   }
 
-  async initialize(subtitleContent) {
-    if (this.initialized) return;
+  async initialize(subtitleContent, subtitlesUrl) {
+    this.subtitlesUrl = subtitlesUrl;
+    this.lastSubtitleContent = subtitleContent;
 
     if (!subtitleContent || subtitleContent.indexOf("[Script Info]") === -1) {
       // Handle VTT fallback if needed
@@ -351,9 +355,30 @@ class SubtitlesManager {
         targetFps: 24,
       });
       this.initialized = true;
+      this.startPollingForUpdates();
     } else {
       throw new Error("SubtitlesOctopus not loaded!");
     }
+  }
+
+  startPollingForUpdates() {
+    if (this.pollInterval) return;
+    this.pollInterval = setInterval(async () => {
+      if (!this.subtitlesUrl) return;
+      try {
+        const response = await fetch(this.subtitlesUrl, { cache: "no-store" });
+        if (response.status === 200) {
+          const newContent = await response.text();
+          if (newContent.length > this.lastSubtitleContent.length) {
+            // Dispose and re-init with new content
+            this.dispose();
+            this.initialize(newContent, this.subtitlesUrl);
+          }
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }, 2000); // Check every 2 seconds
   }
 
   dispose() {
@@ -362,6 +387,10 @@ class SubtitlesManager {
       this.octopus = null;
     }
     this.initialized = false;
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    }
   }
 }
 
@@ -384,6 +413,7 @@ class VideoPlayerController {
     this.playerInitialized = false;
     this.playerStarted = false;
     this.plyrInstance = null;
+    this.subtitlesLoaded = false; // Track if subtitles are loaded
 
     this.bindEvents();
     this.checkInitialState();
@@ -462,10 +492,12 @@ class VideoPlayerController {
 
       const [videoSrc, subtitleContent] = await Promise.all([
         this.resourceLoader.pollUntilReady(videoUrl, false),
-        this.resourceLoader.pollUntilReady(subtitlesUrl, true),
+        this.resourceLoader
+          .pollUntilReady(subtitlesUrl, true)
+          .catch(() => null), // Don't throw if subtitles not ready
       ]);
 
-      this.ui.showStep("Video and subtitles are ready");
+      this.ui.showStep("Video and subtitles are ready (or video only)");
 
       // Set up video
       this.ui.elements.video.src = videoSrc;
@@ -481,9 +513,17 @@ class VideoPlayerController {
 
       this.ui.elements.video.classList.remove("hidden-until-plyr");
 
-      // Initialize subtitles
-      await this.subtitlesManager.initialize(subtitleContent);
-      this.ui.showStep("SubtitlesOctopus initialized");
+      // Initialize subtitles if available
+      if (subtitleContent) {
+        await this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
+        this.subtitlesLoaded = true;
+        this.ui.showStep("SubtitlesOctopus initialized");
+      } else {
+        this.subtitlesLoaded = false;
+        this.ui.showStep(
+          "Subtitles not ready yet, will try again when video is ready"
+        );
+      }
 
       this.ui.setStatusMessage("");
     } catch (error) {
@@ -538,6 +578,25 @@ class VideoPlayerController {
     this.ui.hideStep();
 
     this.retryController.reset();
+
+    // Try to load subtitles if not loaded yet
+    if (!this.subtitlesLoaded) {
+      const subtitlesUrl = `/subtitles?url=${encodeURIComponent(
+        this.magnetUrl
+      )}`;
+      this.resourceLoader
+        .pollUntilReady(subtitlesUrl, true)
+        .then((subtitleContent) => {
+          if (subtitleContent) {
+            this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
+            this.subtitlesLoaded = true;
+            this.ui.showStep("Subtitles loaded after video ready");
+          }
+        })
+        .catch(() => {
+          // Ignore if still not ready
+        });
+    }
   }
 
   handleVideoLoadStart() {
