@@ -507,6 +507,18 @@ class VideoPlayerController {
       if (!this.playerInitialized) {
         this.plyrInstance = new Plyr(this.ui.elements.video, {
           captions: { active: true, update: true, language: "en" },
+          controls: [
+            "play",
+            "progress",
+            "current-time",
+            "mute",
+            "volume",
+            "captions",
+            "settings",
+            "fullscreen",
+            // 'pip' is omitted to disable Picture-in-Picture
+          ],
+          pip: false, // Explicitly disable PiP API
         });
         this.playerInitialized = true;
       }
