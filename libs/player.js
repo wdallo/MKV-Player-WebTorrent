@@ -3,7 +3,7 @@
  * Class-based architecture
  */
 
-// Configuration constants
+// Configuration constants for player behavior and timeouts
 const CONFIG = {
   MAX_RETRIES: 20,
   BASE_RETRY_DELAY: 2000,
@@ -32,6 +32,7 @@ const CONFIG = {
  */
 class UIController {
   constructor() {
+    // Cache references to important DOM elements
     this.elements = {
       progressBar: document.getElementById("progress-bar"),
       statusDetails: document.getElementById("status-details"),
@@ -48,6 +49,7 @@ class UIController {
     this.bindEvents();
   }
 
+  // Bind UI events, such as retry button click
   bindEvents() {
     this.elements.retryBtn?.addEventListener("click", () => {
       this.onRetryClick?.();
@@ -81,6 +83,7 @@ class UIController {
     this.elements.statusDetails.innerHTML = message;
   }
 
+  // Formats the status message for the user
   formatStatusMessage(data, metrics) {
     const { percentage, speedKB, downloadedMB, totalMB } = metrics;
 
@@ -94,7 +97,7 @@ class UIController {
 
     let message = statusMessages[data.status] || `Status: ${data.status}`;
 
-    // Add stall warning
+    // Add stall warning if no peers for a while
     if (
       data.status === "no peers" &&
       data.noPeersSince &&
@@ -107,6 +110,7 @@ class UIController {
     return message;
   }
 
+  // Show debug step message
   showStep(message) {
     if (this.elements.stepDebug) {
       this.elements.stepDebug.textContent = message;
@@ -114,49 +118,59 @@ class UIController {
     }
   }
 
+  // Hide debug step message
   hideStep() {
     if (this.elements.stepDebug) {
       this.elements.stepDebug.style.display = "none";
     }
   }
 
+  // Show error message
   showError(message) {
     this.elements.error.textContent = message;
     this.elements.error.style.display = "";
   }
 
+  // Hide error message
   hideError() {
     this.elements.error.style.display = "none";
   }
 
+  // Show retry button
   showRetryButton() {
     this.elements.retryBtn.style.display = "";
   }
 
+  // Hide retry button
   hideRetryButton() {
     this.elements.retryBtn.style.display = "none";
   }
 
+  // Show video container
   showVideoContainer() {
     this.elements.videoContainer.style.display = "";
   }
 
+  // Hide video container
   hideVideoContainer() {
     this.elements.videoContainer.style.display = "none";
   }
 
+  // Show Plyr loading overlay
   showPlyrLoadingOverlay() {
     if (this.elements.plyrLoadingOverlay) {
       this.elements.plyrLoadingOverlay.style.display = "";
     }
   }
 
+  // Hide Plyr loading overlay
   hidePlyrLoadingOverlay() {
     if (this.elements.plyrLoadingOverlay) {
       this.elements.plyrLoadingOverlay.style.display = "none";
     }
   }
 
+  // Update loading overlay text
   updatePlyrLoadingText(text) {
     const textElement =
       this.elements.plyrLoadingOverlay?.querySelector(".plyr-loading-text");
@@ -165,10 +179,12 @@ class UIController {
     }
   }
 
+  // Hide loading spinner
   hideLoading() {
     this.elements.loading.style.display = "none";
   }
 
+  // Set main status message
   setStatusMessage(message) {
     this.elements.statusMsg.innerHTML = message;
   }
@@ -184,11 +200,13 @@ class RetryController {
     this.retryInterval = null;
   }
 
+  // Reset retry state
   reset() {
     this.retryCount = 0;
     this.clearContinuousRetry();
   }
 
+  // Calculate delay for next retry
   getRetryDelay() {
     return Math.min(
       CONFIG.BASE_RETRY_DELAY + this.retryCount * 500,
@@ -196,10 +214,12 @@ class RetryController {
     );
   }
 
+  // Check if we should retry
   shouldRetry() {
     return this.retryCount < this.maxRetries;
   }
 
+  // Execute a retry with delay and exponential backoff
   async executeRetry(retryFn, onStep) {
     if (this.shouldRetry()) {
       this.retryCount++;
@@ -219,6 +239,7 @@ class RetryController {
     }
   }
 
+  // Start continuous retrying at a fixed interval
   startContinuousRetry(retryFn, onStep) {
     this.retryInterval = setInterval(() => {
       onStep?.("Continuous retry: Reloading video...");
@@ -226,6 +247,7 @@ class RetryController {
     }, CONFIG.CONTINUOUS_RETRY_INTERVAL);
   }
 
+  // Clear the continuous retry interval
   clearContinuousRetry() {
     if (this.retryInterval) {
       clearInterval(this.retryInterval);
@@ -233,6 +255,7 @@ class RetryController {
     }
   }
 
+  // Delay helper
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -248,6 +271,7 @@ class StatusPoller {
     this.noPeersSince = null;
   }
 
+  // Start polling the server for torrent status
   async start(onStatusUpdate) {
     this.isActive = true;
 
@@ -272,10 +296,12 @@ class StatusPoller {
     }
   }
 
+  // Stop polling
   stop() {
     this.isActive = false;
   }
 
+  // Track how long we've had no peers
   updateNoPeersTracking(data) {
     if (data.status === "no peers") {
       if (!this.noPeersSince) {
@@ -288,6 +314,7 @@ class StatusPoller {
     }
   }
 
+  // Delay helper
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -297,6 +324,7 @@ class StatusPoller {
  * Resource Loader - Handles loading of video and subtitle resources
  */
 class ResourceLoader {
+  // Polls a resource URL until it is ready (HTTP 200)
   async pollUntilReady(url, isText = false) {
     for (let i = 0; i < CONFIG.RESOURCE_TIMEOUT; i++) {
       try {
@@ -317,13 +345,14 @@ class ResourceLoader {
     throw new Error(`Timeout waiting for ${url}`);
   }
 
+  // Delay helper
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
 /**
- * Subtitles Manager - Handles subtitle initialization
+ * Subtitles Manager - Handles subtitle initialization and updates
  */
 class SubtitlesManager {
   constructor(videoElement) {
@@ -335,6 +364,7 @@ class SubtitlesManager {
     this.subtitlesUrl = null;
   }
 
+  // Initialize subtitles rendering (ASS/SSA)
   async initialize(subtitleContent, subtitlesUrl) {
     this.subtitlesUrl = subtitlesUrl;
     this.lastSubtitleContent = subtitleContent;
@@ -361,6 +391,7 @@ class SubtitlesManager {
     }
   }
 
+  // Poll for subtitle updates and reload if changed
   startPollingForUpdates() {
     if (this.pollInterval) return;
     this.pollInterval = setInterval(async () => {
@@ -381,6 +412,7 @@ class SubtitlesManager {
     }, 2000); // Check every 2 seconds
   }
 
+  // Dispose of the subtitles renderer and polling
   dispose() {
     if (this.octopus) {
       this.octopus.dispose();
@@ -419,6 +451,7 @@ class VideoPlayerController {
     this.checkInitialState();
   }
 
+  // Bind UI and video events
   bindEvents() {
     // Bind UI events
     this.ui.onRetryClick = () => this.handleManualRetry();
@@ -447,6 +480,7 @@ class VideoPlayerController {
     window.addEventListener("pagehide", () => this.cleanup());
   }
 
+  // Check if player was previously marked as ready (for fast reload)
   checkInitialState() {
     if (localStorage.getItem(this.playerReadyKey) === "1") {
       document.addEventListener("DOMContentLoaded", () => {
@@ -456,6 +490,7 @@ class VideoPlayerController {
     }
   }
 
+  // Initialize the player and start loading resources
   async initialize() {
     try {
       await this.startPlayer();
@@ -464,6 +499,7 @@ class VideoPlayerController {
     }
   }
 
+  // Start the player, load video and subtitles, and initialize Plyr
   async startPlayer() {
     this.ui.showStep("Initializing player...");
 
@@ -503,7 +539,7 @@ class VideoPlayerController {
       this.ui.elements.video.src = videoSrc;
       this.ui.elements.video.load();
 
-      // Initialize Plyr
+      // Initialize Plyr player if not already done
       if (!this.playerInitialized) {
         this.plyrInstance = new Plyr(this.ui.elements.video, {
           captions: { active: true, update: true, language: "en" },
@@ -543,6 +579,7 @@ class VideoPlayerController {
     }
   }
 
+  // Handle status updates from the poller
   handleStatusUpdate(data, errorMsg) {
     if (data) {
       this.ui.updateStatusBar(data);
@@ -569,6 +606,7 @@ class VideoPlayerController {
     }
   }
 
+  // Handle video error event and trigger retry logic
   handleVideoError() {
     console.log("Video error event triggered");
     this.ui.showError("Video loading... (will retry automatically)");
@@ -581,6 +619,7 @@ class VideoPlayerController {
     );
   }
 
+  // Handle video canplay event (ready to play)
   handleVideoCanPlay() {
     this.ui.hideLoading();
     this.ui.showVideoContainer();
@@ -611,22 +650,27 @@ class VideoPlayerController {
     }
   }
 
+  // Handle video loadstart event
   handleVideoLoadStart() {
     this.ui.updatePlyrLoadingText("Loading video...");
   }
 
+  // Handle video loadedmetadata event
   handleVideoLoadedMetadata() {
     this.ui.updatePlyrLoadingText("Loading video data...");
   }
 
+  // Handle video loadeddata event
   handleVideoLoadedData() {
     this.ui.updatePlyrLoadingText("Preparing video...");
   }
 
+  // Handle video canplaythrough event
   handleVideoCanPlayThrough() {
     this.ui.hidePlyrLoadingOverlay();
   }
 
+  // Handle manual retry button click
   handleManualRetry() {
     this.ui.hideRetryButton();
     this.ui.hideError();
@@ -635,6 +679,7 @@ class VideoPlayerController {
     this.ui.elements.video.load();
   }
 
+  // Handle initialization errors
   handleInitializationError(error) {
     this.ui.hideLoading();
     this.ui.showError(error.message);
@@ -642,12 +687,13 @@ class VideoPlayerController {
     this.statusPoller.stop();
   }
 
+  // Cleanup resources and notify server when leaving page
   cleanup() {
     this.statusPoller.stop();
     this.retryController.clearContinuousRetry();
     this.subtitlesManager.dispose();
 
-    // Send goodbye beacon
+    // Send goodbye beacon to server to clean up torrent/files
     navigator.sendBeacon(`/goodbye?url=${encodeURIComponent(this.magnetUrl)}`);
   }
 }

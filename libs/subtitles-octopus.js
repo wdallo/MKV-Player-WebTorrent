@@ -1,24 +1,39 @@
 "use strict";
 
+/**
+ * SubtitlesOctopus - Renders ASS/SSA subtitles on HTML5 video using WebAssembly or fallback worker.
+ */
 class SubtitlesOctopus {
+  /**
+   * Initializes the SubtitlesOctopus renderer.
+   * @param {Object} options - Configuration options for rendering.
+   */
   constructor(options) {
-    this.canvas = options.canvas; // HTML canvas element (optional if video specified)
+    // Canvas for rendering (optional if video specified)
+    this.canvas = options.canvas;
+    // Rendering mode: "wasm-blend", "lossy", etc.
     this.renderMode =
       options.renderMode || (options.lossyRender ? "lossy" : "wasm-blend");
+    // Memory and glyph limits for libass
     this.libassMemoryLimit = options.libassMemoryLimit || 0;
     this.libassGlyphLimit = options.libassGlyphLimit || 0;
+    // Target FPS for rendering
     this.targetFps = options.targetFps || 24;
+    // Prescale options for performance
     this.prescaleFactor = options.prescaleFactor || 1.0;
     this.prescaleHeightLimit = options.prescaleHeightLimit || 1080;
     this.maxRenderHeight = options.maxRenderHeight || 0;
     this.dropAllAnimations = options.dropAllAnimations || false;
     this.isOurCanvas = false;
+    // Video element to render subtitles over
     this.video = options.video;
     this.canvasParent = null;
+    // Font configuration
     this.fonts = options.fonts || [];
     this.availableFonts = options.availableFonts || [];
     this.fallbackFont = options.fallbackFont || "default.woff2";
     this.lazyFileLoading = options.lazyFileLoading || false;
+    // Event handlers
     this.onReadyEvent = options.onReady;
     this.subUrl = options.subUrl;
     this.subContent = options.subContent || null;
@@ -32,6 +47,7 @@ class SubtitlesOctopus {
     this.frameId = 0;
     this.renderFramesData = null;
 
+    // Detect WebAssembly support and select worker
     this.supportsWebAssembly = SubtitlesOctopus.detectWebAssembly();
     this.workerUrl = this.supportsWebAssembly
       ? options.workerUrl || "subtitles-octopus-worker.js"
@@ -41,6 +57,10 @@ class SubtitlesOctopus {
     this.init();
   }
 
+  /**
+   * Detects if WebAssembly is supported in the current browser.
+   * @returns {boolean}
+   */
   static detectWebAssembly() {
     try {
       if (
@@ -59,6 +79,9 @@ class SubtitlesOctopus {
     return false;
   }
 
+  /**
+   * Polyfill for ImageData if needed (for browser compatibility).
+   */
   initImageDataPolyfill() {
     if (typeof ImageData.prototype.constructor === "function") {
       try {
@@ -86,6 +109,9 @@ class SubtitlesOctopus {
     };
   }
 
+  /**
+   * Handles worker errors.
+   */
   workerError = (error) => {
     console.error("Worker error: ", error);
     if (this.onErrorEvent) {
@@ -97,6 +123,9 @@ class SubtitlesOctopus {
     }
   };
 
+  /**
+   * Initializes the worker and rendering environment.
+   */
   init() {
     if (!window.Worker) {
       this.workerError("worker not supported");
@@ -133,6 +162,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Creates the canvas for rendering subtitles.
+   */
   createCanvas() {
     if (!this.canvas) {
       if (this.video) {
@@ -165,7 +197,7 @@ class SubtitlesOctopus {
       willReadFrequently: true,
     });
 
-    // test for alpha bug
+    // Test for alpha bug in some browsers
     this.bufferCanvas.width = 1;
     this.bufferCanvas.height = 1;
     const testBuf = new Uint8ClampedArray([0, 255, 0, 0]);
@@ -184,6 +216,10 @@ class SubtitlesOctopus {
     }
   }
 
+  /**
+   * Sets the video element for subtitle rendering and binds events.
+   * @param {HTMLVideoElement} video
+   */
   setVideo(video) {
     this.video = video;
     if (!this.video) return;
@@ -233,6 +269,10 @@ class SubtitlesOctopus {
     }
   }
 
+  /**
+   * Calculates the position and size of the video for subtitle overlay.
+   * @returns {Object} - { width, height, x, y }
+   */
   getVideoPosition() {
     const videoRatio = this.video.videoWidth / this.video.videoHeight;
     const width = this.video.offsetWidth,
@@ -249,10 +289,17 @@ class SubtitlesOctopus {
     return { width: realWidth, height: realHeight, x, y };
   }
 
+  /**
+   * Sets the subtitle URL for loading.
+   * @param {string} subUrl
+   */
   setSubUrl(subUrl) {
     this.subUrl = subUrl;
   }
 
+  /**
+   * Renders frames received from the worker (blend mode).
+   */
   renderFrames = () => {
     const data = this.renderFramesData;
     const beforeDrawTime = performance.now();
@@ -290,6 +337,9 @@ class SubtitlesOctopus {
     }
   };
 
+  /**
+   * Renders frames received from the worker (fast bitmap mode).
+   */
   renderFastFrames = () => {
     const data = this.renderFramesData;
     const beforeDrawTime = performance.now();
@@ -308,6 +358,9 @@ class SubtitlesOctopus {
     }
   };
 
+  /**
+   * Handles messages from the worker.
+   */
   onWorkerMessage = (event) => {
     if (!this.workerActive) {
       this.workerActive = true;
@@ -391,6 +444,9 @@ class SubtitlesOctopus {
     }
   };
 
+  /**
+   * Computes the canvas size for rendering subtitles.
+   */
   _computeCanvasSize(width, height) {
     const scalefactor = this.prescaleFactor <= 0 ? 1.0 : this.prescaleFactor;
     if (height <= 0 || width <= 0) {
@@ -411,6 +467,9 @@ class SubtitlesOctopus {
     return { width, height };
   }
 
+  /**
+   * Resizes the subtitle canvas to match the video or specified size.
+   */
   resize = (width, height, top = 0, left = 0) => {
     let videoSize = null;
     if ((!width || !height) && this.video) {
@@ -461,15 +520,24 @@ class SubtitlesOctopus {
     }
   };
 
+  /**
+   * Resizes the canvas with a timeout (for fullscreen changes, etc.).
+   */
   resizeWithTimeout = () => {
     this.resize();
     setTimeout(this.resize, 100);
   };
 
+  /**
+   * Runs a benchmark in the worker.
+   */
   runBenchmark() {
     this.worker.postMessage({ target: "runBenchmark" });
   }
 
+  /**
+   * Sends a custom message to the worker.
+   */
   customMessage(data, options = {}) {
     this.worker.postMessage({
       target: "custom",
@@ -478,6 +546,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Sets the current playback time for subtitle rendering.
+   */
   setCurrentTime(currentTime) {
     this.worker.postMessage({
       target: "video",
@@ -485,6 +556,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Sets the subtitle track by URL.
+   */
   setTrackByUrl(url) {
     this.worker.postMessage({
       target: "set-track-by-url",
@@ -492,6 +566,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Sets the subtitle track by content.
+   */
   setTrack(content) {
     this.worker.postMessage({
       target: "set-track",
@@ -499,12 +576,18 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Frees the current subtitle track.
+   */
   freeTrack() {
     this.worker.postMessage({
       target: "free-track",
     });
   }
 
+  /**
+   * Sets the paused state for subtitle rendering.
+   */
   setIsPaused(isPaused, currentTime) {
     this.worker.postMessage({
       target: "video",
@@ -513,6 +596,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Sets the playback rate for subtitle rendering.
+   */
   setRate(rate) {
     this.worker.postMessage({
       target: "video",
@@ -520,6 +606,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Cleans up and disposes the renderer and worker.
+   */
   dispose() {
     this.worker.postMessage({ target: "destroy" });
     this.worker.terminate();
@@ -575,6 +664,9 @@ class SubtitlesOctopus {
     this.onReadyEvent = null;
   }
 
+  /**
+   * Fetches data from the worker with a timeout and success/error callbacks.
+   */
   fetchFromWorker(workerOptions, onSuccess, onError) {
     try {
       const target = workerOptions["target"];
@@ -607,6 +699,9 @@ class SubtitlesOctopus {
     }
   }
 
+  /**
+   * Creates a new subtitle event in the worker.
+   */
   createEvent(event) {
     this.worker.postMessage({
       target: "create-event",
@@ -614,6 +709,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Gets all subtitle events from the worker.
+   */
   getEvents(onSuccess, onError) {
     this.fetchFromWorker(
       {
@@ -624,6 +722,9 @@ class SubtitlesOctopus {
     );
   }
 
+  /**
+   * Sets a subtitle event at a specific index.
+   */
   setEvent(event, index) {
     this.worker.postMessage({
       target: "set-event",
@@ -632,6 +733,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Removes a subtitle event at a specific index.
+   */
   removeEvent(index) {
     this.worker.postMessage({
       target: "remove-event",
@@ -639,6 +743,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Creates a new subtitle style in the worker.
+   */
   createStyle(style) {
     this.worker.postMessage({
       target: "create-style",
@@ -646,6 +753,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Gets all subtitle styles from the worker.
+   */
   getStyles(onSuccess, onError) {
     this.fetchFromWorker(
       {
@@ -656,6 +766,9 @@ class SubtitlesOctopus {
     );
   }
 
+  /**
+   * Sets a subtitle style at a specific index.
+   */
   setStyle(style, index) {
     this.worker.postMessage({
       target: "set-style",
@@ -664,6 +777,9 @@ class SubtitlesOctopus {
     });
   }
 
+  /**
+   * Removes a subtitle style at a specific index.
+   */
   removeStyle(index) {
     this.worker.postMessage({
       target: "remove-style",
@@ -708,10 +824,12 @@ class SubtitlesOctopus {
   };
 }
 
+// Call global on-load handler if present
 if (typeof SubtitlesOctopusOnLoad === "function") {
   SubtitlesOctopusOnLoad();
 }
 
+// Export for CommonJS or browser global
 if (typeof exports !== "undefined") {
   if (typeof module !== "undefined" && module.exports) {
     exports = module.exports = SubtitlesOctopus;

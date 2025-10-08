@@ -5,6 +5,7 @@ import { rm } from "fs/promises";
 const MIN_READY_BYTES = 256 * 1024; // 256KB for ultra-fast start
 const PRIORITY_PIECES = 20; // Download first 20 pieces with priority
 
+// Streams video content for a given magnet link, supporting HTTP range requests
 export function streamVideo(req, res) {
   const magnet = req.query.url;
   console.log(`[VIDEO] Request for video. Magnet: ${magnet}`);
@@ -23,7 +24,7 @@ export function streamVideo(req, res) {
 
   // Set priority for first pieces (contains MKV metadata)
   if (videoFile._torrent) {
-    // Download first 10 pieces with highest priority
+    // Download first PRIORITY_PIECES with highest priority
     for (
       let i = 0;
       i < Math.min(PRIORITY_PIECES, videoFile._torrent.pieces.length);
@@ -45,6 +46,7 @@ export function streamVideo(req, res) {
       `[VIDEO] Allowing stream: downloaded=${videoFile.downloaded} bytes (>256KB)`
     );
   } else if (videoFile.downloaded < MIN_READY_BYTES || !firstPieceDownloaded) {
+    // Not enough data to start streaming
     console.log(
       `[VIDEO] Not enough data: downloaded=${videoFile.downloaded} bytes, need at least ${MIN_READY_BYTES} bytes for ${videoFile.name}`
     );
@@ -58,7 +60,7 @@ export function streamVideo(req, res) {
   // Helper: get last downloaded byte
   const lastDownloadedByte = videoFile.downloaded - 1;
   if (!range) {
-    // Only serve up to downloaded bytes
+    // No range header: serve from 0 up to downloaded bytes
     const end = Math.min(fileLength - 1, lastDownloadedByte);
     if (end < 0) {
       res.status(416).send("No data available yet");
@@ -81,6 +83,7 @@ export function streamVideo(req, res) {
     stream.pipe(res);
     return;
   }
+  // Handle HTTP range requests for seeking/partial playback
   const parts = range.replace(/bytes=/, "").split("-");
   const start = parseInt(parts[0], 10);
   let end = parts[1] ? parseInt(parts[1], 10) : fileLength - 1;
@@ -119,12 +122,14 @@ export function streamVideo(req, res) {
   stream.pipe(res);
 }
 
+// Handles cleanup: destroys torrent and deletes downloaded files
 export async function goodbye(req, res) {
   const magnet = req.query.url;
   // Always destroy the torrent first
   const torrentPath = destroyTorrent(magnet);
   if (torrentPath) {
     try {
+      // Recursively delete the torrent's files/folder
       await rm(torrentPath, { recursive: true, force: true });
       res.status(200).send("Torrent destroyed and files deleted");
     } catch (err) {

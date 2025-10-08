@@ -1,15 +1,19 @@
 // Torrent status controller
 import { getOrAddTorrent } from "../services/torrentService.js";
 
+// Returns the status of a torrent given a magnet link
 export function getStatus(req, res) {
   const magnet = req.query.url;
   if (!magnet) return res.status(400).json({ error: "Missing url param" });
+
+  // Get or add the torrent to the client
   const state = getOrAddTorrent(magnet);
   if (!state || !state.torrent) {
     return res.status(404).json({ error: "Torrent not found" });
   }
   const t = state.torrent;
   let status = "unknown";
+  // Determine torrent status
   if (!t.metadata) {
     status = "fetching metadata";
   } else if (t.numPeers === 0) {
@@ -21,6 +25,7 @@ export function getStatus(req, res) {
   } else {
     status = "downloading";
   }
+  // Respond with torrent status and stats
   res.json({
     status,
     infoHash: t.infoHash,
@@ -37,6 +42,8 @@ export function getStatus(req, res) {
     error: t.error ? t.error.message : undefined,
   });
 }
+
+// Renders system information (memory, CPU, uptime, etc.) to the sysinfo EJS view
 export function getSysInfo(req, res) {
   const mem = process.memoryUsage();
   const cpu = process.cpuUsage();

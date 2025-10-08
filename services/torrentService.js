@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
 
 // Watch for file deletions in the download directory
+// If a video file is deleted from disk, remove its torrent from the client and memory
 try {
   fs.watch(DOWNLOAD_DIR, (eventType, filename) => {
     if (eventType === "rename" && filename) {
@@ -37,6 +38,7 @@ try {
   console.error("Failed to watch download directory:", e);
 }
 
+// Create a WebTorrent client with custom options
 const client = new WebTorrent({
   maxConns: 50, // Lowered to avoid resource exhaustion
   nodeId: null, // Random node ID
@@ -48,8 +50,19 @@ const client = new WebTorrent({
   utp: true, // Enable uTP
   blocklist: false, // Disable blocklist for speed
 });
-const torrents = {}; // magnet -> { torrent, videoFile, videoMime, lastAccess }
 
+// Store all active torrents and their state
+// Structure: magnet -> { torrent, videoFile, videoMime, lastAccess }
+const torrents = {};
+
+/**
+ * Get or add a torrent to the client.
+ * If already present, returns the state and boosts priority for fast streaming.
+ * If not, adds the torrent and sets up video file selection.
+ * @param {string} magnet - Magnet URI
+ * @param {function} [cb] - Optional callback when torrent is ready
+ * @returns {object|null} Torrent state or null if invalid
+ */
 function getOrAddTorrent(magnet, cb) {
   if (!magnet || !magnet.startsWith("magnet:")) return null;
   if (torrents[magnet]) {
@@ -74,16 +87,19 @@ function getOrAddTorrent(magnet, cb) {
     if (cb) cb(torrents[magnet].torrent);
     return torrents[magnet];
   }
+  // Create new torrent state
   torrents[magnet] = {
     torrent: null,
     videoFile: null,
     videoMime: "video/mp4",
     lastAccess: Date.now(),
   };
+  // Add torrent to client
   torrents[magnet].torrent = client.add(
     magnet,
     { path: DOWNLOAD_DIR },
     (torrent) => {
+      // Find the main video file (.mp4 or .mkv)
       const videoFile = torrent.files.find(
         (f) => f.name.endsWith(".mp4") || f.name.endsWith(".mkv")
       );
@@ -104,6 +120,10 @@ function getOrAddTorrent(magnet, cb) {
   return torrents[magnet];
 }
 
+/**
+ * Destroy a torrent and remove it from the client and memory.
+ * @param {string} magnet - Magnet URI
+ */
 function destroyTorrent(magnet) {
   if (!magnet || !torrents[magnet]) return;
   const state = torrents[magnet];
