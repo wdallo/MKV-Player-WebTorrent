@@ -37,3 +37,15 @@ export function getStatus(req, res) {
     error: t.error ? t.error.message : undefined,
   });
 }
+export function getSysInfo(req, res) {
+  const mem = process.memoryUsage();
+  const cpu = process.cpuUsage();
+  res.render("sysinfo", {
+    memory: mem,
+    cpu: cpu,
+    uptime: process.uptime(),
+    pid: process.pid,
+    platform: process.platform,
+    nodeVersion: process.version,
+  });
+}
