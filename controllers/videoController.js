@@ -1,5 +1,6 @@
 // Video streaming controller
-import { getOrAddTorrent } from "../services/torrentService.js";
+import { getOrAddTorrent, destroyTorrent } from "../services/torrentService.js";
+import { rm } from "fs/promises";
 
 const MIN_READY_BYTES = 256 * 1024; // 256KB for ultra-fast start
 const PRIORITY_PIECES = 20; // Download first 20 pieces with priority
@@ -116,4 +117,21 @@ export function streamVideo(req, res) {
     stream.destroy();
   });
   stream.pipe(res);
+}
+
+export async function goodbye(req, res) {
+  const magnet = req.query.url;
+  // Always destroy the torrent first
+  const torrentPath = destroyTorrent(magnet);
+  if (torrentPath) {
+    try {
+      await rm(torrentPath, { recursive: true, force: true });
+      res.status(200).send("Torrent destroyed and files deleted");
+    } catch (err) {
+      console.error("Failed to delete files:", err);
+      res.status(500).send("Torrent destroyed, but failed to delete files");
+    }
+  } else {
+    res.status(200).send("Torrent destroyed (no files to delete)");
+  }
 }
