@@ -44,6 +44,9 @@ class UIController {
       videoContainer: document.getElementById("video-container"),
       plyrLoadingOverlay: document.getElementById("plyr-loading-overlay"),
       video: document.getElementById("player"),
+      resumeBtn: document.getElementById("resume-btn"),
+      restartBtn: document.getElementById("restart-btn"),
+      resumeModule: document.getElementById("resume-module-inner"),
     };
 
     this.bindEvents();
@@ -53,6 +56,12 @@ class UIController {
   bindEvents() {
     this.elements.retryBtn?.addEventListener("click", () => {
       this.onRetryClick?.();
+    });
+    this.elements.resumeBtn?.addEventListener("click", () => {
+      this.onResumeClick?.();
+    });
+    this.elements.restartBtn?.addEventListener("click", () => {
+      this.onRestartClick?.();
     });
   }
 
@@ -187,6 +196,21 @@ class UIController {
   // Set main status message
   setStatusMessage(message) {
     this.elements.statusMsg.innerHTML = message;
+  }
+
+  // Show resume button
+  showResumeButton() {
+    if (this.elements.resumeBtn) this.elements.resumeBtn.style.display = "";
+    if (this.elements.restartBtn) this.elements.restartBtn.style.display = "";
+    if (this.elements.resumeModule)
+      this.elements.resumeModule.style.display = "flex";
+  }
+  hideResumeButton() {
+    if (this.elements.resumeBtn) this.elements.resumeBtn.style.display = "none";
+    if (this.elements.restartBtn)
+      this.elements.restartBtn.style.display = "none";
+    if (this.elements.resumeModule)
+      this.elements.resumeModule.style.display = "none";
   }
 }
 
@@ -433,6 +457,7 @@ class VideoPlayerController {
   constructor(magnetUrl) {
     this.magnetUrl = magnetUrl;
     this.playerReadyKey = `playerReady_${magnetUrl}`;
+    this.resumeTimeKey = `resumeTime_${magnetUrl}`;
 
     // Initialize components
     this.ui = new UIController();
@@ -455,6 +480,8 @@ class VideoPlayerController {
   bindEvents() {
     // Bind UI events
     this.ui.onRetryClick = () => this.handleManualRetry();
+    this.ui.onResumeClick = () => this.handleResumeClick();
+    this.ui.onRestartClick = () => this.handleRestartClick();
 
     // Video events
     this.ui.elements.video.addEventListener("error", () =>
@@ -475,6 +502,16 @@ class VideoPlayerController {
     this.ui.elements.video.addEventListener("canplaythrough", () =>
       this.handleVideoCanPlayThrough()
     );
+
+    // Save playback position periodically
+    this.ui.elements.video.addEventListener("timeupdate", () => {
+      const t = this.ui.elements.video.currentTime;
+      const duration = this.ui.elements.video.duration;
+      // Only save if playing, time > 0, and not at end
+      if (!this.ui.elements.video.paused && t > 0 && t < duration - 1) {
+        localStorage.setItem(this.resumeTimeKey, t);
+      }
+    });
 
     // Cleanup on page leave
     window.addEventListener("pagehide", () => this.cleanup());
@@ -658,6 +695,21 @@ class VideoPlayerController {
   // Handle video loadedmetadata event
   handleVideoLoadedMetadata() {
     this.ui.updatePlyrLoadingText("Loading video data...");
+
+    // Restore playback position on loadedmetadata
+    const resumeTime = parseFloat(localStorage.getItem(this.resumeTimeKey));
+
+    if (
+      !isNaN(resumeTime) &&
+      resumeTime > 0 &&
+      resumeTime < this.ui.elements.video.duration
+    ) {
+      this.ui.showResumeButton();
+      this._pendingResumeTime = resumeTime;
+    } else {
+      this.ui.hideResumeButton();
+      this._pendingResumeTime = null;
+    }
   }
 
   // Handle video loadeddata event
@@ -677,6 +729,28 @@ class VideoPlayerController {
     this.retryController.reset();
     this.ui.showStep("Manual retry triggered");
     this.ui.elements.video.load();
+  }
+
+  // Handle resume button click
+  handleResumeClick() {
+    this.ui.hideResumeButton(); // Hide immediately, always
+    if (
+      this._pendingResumeTime &&
+      this.ui.elements.video.duration > this._pendingResumeTime
+    ) {
+      this.ui.elements.video.currentTime = this._pendingResumeTime;
+    }
+  }
+
+  // Handle restart button click
+  handleRestartClick() {
+    this.ui.elements.video.currentTime = 0;
+    this.ui.hideResumeButton();
+    localStorage.removeItem(this.resumeTimeKey);
+    // Always play from beginning
+    if (this.ui.elements.video.paused) {
+      this.ui.elements.video.play();
+    }
   }
 
   // Handle initialization errors
