@@ -162,6 +162,198 @@
       >
         Retry Video Load
       </button>
+      <!-- Move resume/restart buttons inside video container for better placement -->
+      <div
+        id="video-container"
+        style="
+          margin: 0 auto;
+          max-width: 850px;
+          position: relative;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 12px #0008;
+          background: #000;
+          min-height: 480px;
+          display: none;
+        "
+      >
+        <div id="plyr-loading-overlay" class="plyr-loading-overlay">
+          <div style="text-align: center">
+            <div class="plyr-spinner"></div>
+            <div class="plyr-loading-text">Loading video player...</div>
+          </div>
+        </div>
+        <div style="position: relative; width: 100%; height: 100%">
+          <video
+            id="player"
+            class="hidden-until-plyr"
+            controls
+            crossorigin
+            playsinline
+            preload="metadata"
+            width="850"
+            autoplay
+            style="
+              background: #000;
+              aspect-ratio: 16/9;
+              display: block;
+              width: 100%;
+              height: auto;
+            "
+          ></video>
+          <div
+            id="resume-module"
+            style="
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              z-index: 10000;
+              pointer-events: none;
+            "
+          >
+            <div
+              id="resume-module-inner"
+              style="
+                display: none;
+                flex-direction: column;
+                align-items: center;
+                background: rgba(34, 34, 34, 0.97);
+                border-radius: 12px;
+                box-shadow: 0 4px 16px #000a;
+                padding: 28px 36px 24px 36px;
+                min-width: 260px;
+                gap: 18px;
+                border: 1.5px solid #333;
+                pointer-events: auto;
+              "
+            >
+              <div
+                style="
+                  font-size: 1.15em;
+                  color: #fff;
+                  font-weight: 500;
+                  margin-bottom: 10px;
+                  text-align: center;
+                "
+              >
+                Resume playback?
+              </div>
+              <button
+                id="resume-btn"
+                style="
+                  display: none;
+                  background: #4caf50;
+                  color: white;
+                  border: none;
+                  padding: 10px 20px;
+                  border-radius: 5px;
+                  cursor: pointer;
+                  font-size: 1em;
+                  margin-bottom: 8px;
+                "
+              >
+                Resume from last position
+              </button>
+              <button
+                id="restart-btn"
+                style="
+                  display: none;
+                  background: #f44336;
+                  color: white;
+                  border: none;
+                  padding: 10px 20px;
+                  border-radius: 5px;
+                  cursor: pointer;
+                  font-size: 1em;
+                "
+              >
+                Start from beginning
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Resume/Restart module overlay OUTSIDE video container for fullscreen support -->
+      <div
+        id="resume-module"
+        style="
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 10000;
+          pointer-events: none;
+        "
+      >
+        <div
+          id="resume-module-inner"
+          style="
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(34, 34, 34, 0.97);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px #000a;
+            padding: 28px 36px 24px 36px;
+            min-width: 260px;
+            gap: 18px;
+            border: 1.5px solid #333;
+            pointer-events: auto;
+          "
+        >
+          <div
+            style="
+              font-size: 1.15em;
+              color: #fff;
+              font-weight: 500;
+              margin-bottom: 10px;
+              text-align: center;
+            "
+          >
+            Resume playback?
+          </div>
+          <button
+            id="resume-btn"
+            style="
+              display: none;
+              background: #4caf50;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 1em;
+              margin-bottom: 8px;
+            "
+          >
+            Resume from last position
+          </button>
+          <button
+            id="restart-btn"
+            style="
+              display: none;
+              background: #f44336;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 1em;
+            "
+          >
+            Start from beginning
+          </button>
+        </div>
+      </div>
       <div id="step-debug"></div>
 
       <!-- Video Player Container with Loading Overlay -->
