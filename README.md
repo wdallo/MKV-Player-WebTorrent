@@ -15,6 +15,7 @@ A modern Node.js/Express app for streaming MKV/MP4 video files directly from tor
 - CORS enabled for easy local development
 - Instant resource cleanup: Torrents are destroyed when the user closes the browser tab or deletes the file
 - Live system info: `/sysinfo` endpoint for real-time Node.js resource stats
+- The MKV Player now supports a configurable watermark overlay on the video player.
 
 ## Project Structure
 
