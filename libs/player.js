@@ -13,6 +13,8 @@ const CONFIG = {
   READY_THRESHOLD: 256 * 1024, // 256KB
   RESOURCE_TIMEOUT: 300, // 150 seconds
   STALL_TIMEOUT: 20000, // 20 seconds
+  WATERMARK: true, // True Shows WaterMark On Player || False disables WaterMark
+  WATERMARK_CONTENT: "Demo Watermark", // Text Showing On Video Ak WaterMark
 };
 
 // Type definitions (for better code documentation)
@@ -471,8 +473,20 @@ class VideoPlayerController {
     this.plyrInstance = null;
     this.subtitlesLoaded = false; // Track if subtitles are loaded
 
+    // Show/hide watermark based on config
+    const watermark = document.querySelector(".video-watermark");
+    if (watermark) {
+      watermark.style.display = CONFIG.WATERMARK ? "" : "none";
+      if (CONFIG.WATERMARK_CONTENT) {
+        watermark.textContent = CONFIG.WATERMARK_CONTENT;
+      }
+    }
+
     this.bindEvents();
     this.checkInitialState();
+
+    // Initialize fullscreen controller
+    this.fullscreenController = new FullscreenController();
   }
 
   // Bind UI and video events
@@ -772,5 +786,73 @@ class VideoPlayerController {
 
     // Send goodbye beacon to server to clean up torrent/files
     navigator.sendBeacon(`/goodbye?url=${encodeURIComponent(this.magnetUrl)}`);
+  }
+}
+
+/**
+ * Fullscreen Controller - Handles fullscreen mode overlay management
+ */
+class FullscreenController {
+  constructor() {
+    this.watermark = document.querySelector(".video-watermark");
+    this.resumeModule = document.getElementById("resume-module");
+
+    this.bindEvents();
+  }
+
+  // Bind fullscreen change events
+  bindEvents() {
+    document.addEventListener("fullscreenchange", () => {
+      this.handleFullscreenOverlay();
+    });
+  }
+
+  // Handle fullscreen overlay positioning
+  handleFullscreenOverlay() {
+    const fsElement = document.fullscreenElement;
+
+    if (fsElement) {
+      this.enterFullscreen(fsElement);
+    } else {
+      this.exitFullscreen();
+    }
+  }
+
+  // Configure elements for fullscreen mode
+  enterFullscreen(fsElement) {
+    if (this.watermark) {
+      fsElement.appendChild(this.watermark);
+      this.watermark.style.position = "absolute";
+      this.watermark.style.top = "20px";
+      this.watermark.style.right = "30px";
+      this.watermark.style.zIndex = "2147483647";
+    }
+
+    if (this.resumeModule) {
+      fsElement.appendChild(this.resumeModule);
+      this.resumeModule.style.position = "absolute";
+      this.resumeModule.style.top = "0";
+      this.resumeModule.style.left = "0";
+      this.resumeModule.style.width = "100%";
+      this.resumeModule.style.height = "100%";
+      this.resumeModule.style.zIndex = "10000";
+    }
+  }
+
+  // Restore elements to normal container when exiting fullscreen
+  exitFullscreen() {
+    const container = document.querySelector(".video-container-tag");
+
+    if (container && this.watermark && !container.contains(this.watermark)) {
+      container.appendChild(this.watermark);
+    }
+
+    if (
+      container &&
+      this.resumeModule &&
+      !container.contains(this.resumeModule)
+    ) {
+      container.appendChild(this.resumeModule);
+    }
   }
 }

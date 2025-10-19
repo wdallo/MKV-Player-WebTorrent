@@ -34,6 +34,26 @@ body {
   height: 100%;
   aspect-ratio: 16/9;
 }
+.video-watermark {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 22px;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 2147483647;
+  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.5);
+}
+.video-watermark,
+.video-container-tag:fullscreen .video-watermark,
+.video-container-tag:-webkit-full-screen .video-watermark {
+  top: 20px;
+  right: 30px;
+  font-size: 2em;
+  z-index: 2147483647;
+  /* You can adjust font-size and position for fullscreen */
+}
 .video-player-tag {
   background: #000;
   aspect-ratio: 16/9;
