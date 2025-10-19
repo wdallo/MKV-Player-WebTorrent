@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MKV Player - Enter Magnet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/libs/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Paste Magnet URL</h1>
+      <form id="magnet-form" class="magnet-form">
+        <input
+          type="text"
+          id="magnet-url"
+          name="url"
+          placeholder="Paste magnet:?xt=..."
+          class="magnet-form-input"
+          required
+        />
+        <div class="magnet-form-helper">
+          Example:
+          <code>magnet:?xt=urn:btih:QQSOBFAQDJ4A4ROQILCNMHDGP2BT72J5</code>
+        </div>
+        <button type="submit" class="magnet-form-btn">Load Magnet</button>
+
+        <div
+          id="magnet-error"
+          class="magnet-form-error"
+          style="display: none"
+        ></div>
+      </form>
+    </main>
+    <script>
+      document
+        .getElementById("magnet-form")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          const url = document.getElementById("magnet-url").value.trim();
+          const errorDiv = document.getElementById("magnet-error");
+          if (url && url.startsWith("magnet:")) {
+            errorDiv.style.display = "none";
+            window.location.href = "/player?url=" + encodeURIComponent(url);
+          } else {
+            errorDiv.textContent = "Please enter a valid magnet URL.";
+            errorDiv.style.display = "block";
+          }
+        });
+    </script>
+  </body>
+</html>
