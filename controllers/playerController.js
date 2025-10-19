@@ -10,3 +10,7 @@ export function renderPlayer(req, res) {
   // Render the player EJS view, passing the magnet link
   res.render("player", { magnet });
 }
+
+export function renderIndex(req, res) {
+  res.render("index");
+}

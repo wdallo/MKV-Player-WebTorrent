@@ -244,3 +244,83 @@ h1 {
 .hidden-until-plyr {
   visibility: hidden;
 }
+.back-btn {
+  display: inline-block;
+  background: #222;
+  color: #fff;
+  text-decoration: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 1em;
+  transition: background 0.2s;
+  margin-bottom: 10px;
+}
+.back-btn:hover,
+.back-btn:focus {
+  background: #2196f3;
+  color: #fff;
+}
+.back-btn-topright {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  margin: 18px 18px 0 0;
+  z-index: 20;
+}
+/* styles for index.ejs */
+.magnet-form {
+  max-width: 600px;
+  margin: 40px auto;
+}
+.magnet-form-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 1.1em;
+  border: 1.5px solid #2a2a2a;
+  border-radius: 8px;
+  background: #181818;
+  color: #eaeaea;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px #0002;
+  transition: border 0.2s;
+}
+.magnet-form-input:focus {
+  outline: none;
+  border-color: #00bfff;
+}
+.magnet-form-btn {
+  padding: 10px 28px;
+  font-size: 1.1em;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #00bfff 0%, #0077ff 100%);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #0002;
+  transition: background 0.2s, transform 0.1s;
+}
+.magnet-form-btn:hover,
+.magnet-form-btn:focus {
+  background: linear-gradient(90deg, #0099ff 0%, #0055cc 100%);
+  transform: translateY(-2px) scale(1.03);
+}
+.magnet-form-error {
+  color: #ff5252;
+  margin-top: 10px;
+  font-size: 1em;
+  font-weight: 500;
+  display: none;
+}
+.magnet-form-helper {
+  color: #bbb;
+  font-size: 0.97em;
+  margin: 8px 0 30px 2px;
+}
+.magnet-form-helper code {
+  background: #232323;
+  color: #90caf9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.97em;
+}

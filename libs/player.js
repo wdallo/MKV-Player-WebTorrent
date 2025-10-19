@@ -4,17 +4,18 @@
  */
 
 // Configuration constants for player behavior and timeouts
+// Player configuration constants
 const CONFIG = {
-  MAX_RETRIES: 20,
-  BASE_RETRY_DELAY: 2000,
-  MAX_RETRY_DELAY: 10000,
-  CONTINUOUS_RETRY_INTERVAL: 30000,
-  STATUS_POLL_INTERVAL: 1000,
-  READY_THRESHOLD: 256 * 1024, // 256KB
-  RESOURCE_TIMEOUT: 300, // 150 seconds
-  STALL_TIMEOUT: 20000, // 20 seconds
-  WATERMARK: true, // True Shows WaterMark On Player || False disables WaterMark
-  WATERMARK_CONTENT: "Demo Watermark", // Text Showing On Video Ak WaterMark
+  MAX_RETRIES: 20, // Maximum number of retry attempts before switching to continuous retry
+  BASE_RETRY_DELAY: 2000, // Initial delay (ms) before retrying video load
+  MAX_RETRY_DELAY: 10000, // Maximum delay (ms) between retries
+  CONTINUOUS_RETRY_INTERVAL: 30000, // Interval (ms) for continuous retry after max retries reached
+  STATUS_POLL_INTERVAL: 1000, // Interval (ms) for polling torrent status from server
+  READY_THRESHOLD: 256 * 1024, // Bytes downloaded before marking player as ready (256KB)
+  RESOURCE_TIMEOUT: 300, // Number of polling attempts before timing out resource loading (approx 150 seconds)
+  STALL_TIMEOUT: 20000, // Time (ms) to wait before considering torrent stalled (no peers)
+  WATERMARK: false, // Show watermark on player if true
+  WATERMARK_CONTENT: "Demo Watermark", // Text to display as watermark on video
 };
 
 // Type definitions (for better code documentation)
