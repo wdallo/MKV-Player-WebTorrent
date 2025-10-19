@@ -36,7 +36,6 @@ class UIController {
     this.elements = {
       progressBar: document.getElementById("progress-bar"),
       statusDetails: document.getElementById("status-details"),
-      stepDebug: document.getElementById("step-debug"),
       loading: document.getElementById("loading"),
       error: document.getElementById("error"),
       statusMsg: document.getElementById("status-msg"),
@@ -589,7 +588,6 @@ class VideoPlayerController {
             "captions",
             "settings",
             "fullscreen",
-            // 'pip' is omitted to disable Picture-in-Picture
           ],
           pip: false, // Explicitly disable PiP API
         });
@@ -739,6 +737,11 @@ class VideoPlayerController {
       this.ui.elements.video.duration > this._pendingResumeTime
     ) {
       this.ui.elements.video.currentTime = this._pendingResumeTime;
+
+      // Start playback if paused
+      if (this.ui.elements.video.paused) {
+        this.ui.elements.video.play(); // starts playing video
+      }
     }
   }
 
@@ -749,7 +752,7 @@ class VideoPlayerController {
     localStorage.removeItem(this.resumeTimeKey);
     // Always play from beginning
     if (this.ui.elements.video.paused) {
-      this.ui.elements.video.play();
+      this.ui.elements.video.play(); // starts playing video
     }
   }
 

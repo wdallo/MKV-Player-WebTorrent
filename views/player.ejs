@@ -12,19 +12,25 @@
     <script src="/libs/subtitles-octopus.js"></script>
   </head>
   <body>
-    <div class="container">
-      <h1>MKV Video Player</h1>
-      <!-- Download Status Bar and Details -->
-      <div class="status-details" id="status-details">&nbsp;</div>
-      <div class="progress-container">
-        <div class="progress-bar" id="progress-bar"></div>
-      </div>
-      <div id="loading">Loading video and subtitles, please wait...</div>
-      <div id="status-msg"></div>
-      <div id="error"></div>
-      <button id="retry-btn" class="retry-button">Retry Video Load</button>
-      <!-- Move resume/restart buttons inside video container for better placement -->
-      <div id="video-container" class="video-container-main">
+    <main class="container">
+      <header>
+        <h1>MKV Video Player</h1>
+      </header>
+
+      <!-- Download Status Section -->
+      <section class="status-section">
+        <div class="status-details" id="status-details">&nbsp;</div>
+        <div class="progress-container">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div id="loading">Loading video and subtitles, please wait...</div>
+        <div id="status-msg"></div>
+        <div id="error"></div>
+        <button id="retry-btn" class="retry-button">Retry Video Load</button>
+      </section>
+
+      <!-- Video Player Section -->
+      <section id="video-container" class="video-container-main">
         <div id="plyr-loading-overlay" class="plyr-loading-overlay">
           <div style="text-align: center">
             <div class="plyr-spinner"></div>
@@ -40,11 +46,18 @@
             playsinline
             preload="metadata"
             width="850"
-            autoplay
           ></video>
-          <div id="resume-module" class="resume-module">
+          <div
+            id="resume-module"
+            class="resume-module"
+            role="dialog"
+            aria-labelledby="resume-title"
+            aria-modal="true"
+          >
             <div id="resume-module-inner" class="resume-module-inner">
-              <div class="playback-title">Resume playback?</div>
+              <div id="resume-title" class="playback-title">
+                Resume playback?
+              </div>
               <button id="resume-btn" class="resume-button">
                 Resume from last position
               </button>
@@ -54,30 +67,14 @@
             </div>
           </div>
         </div>
-      </div>
+      </section>
+    </main>
 
-      <div id="step-debug"></div>
+    <footer class="footer">
+      Created with ❤️ by
+      <a href="https://github.com/wdallo" target="_blank"> wdallo </a>
+    </footer>
 
-      <!-- Video Player Container with Loading Overlay -->
-      <div id="video-container" class="video-container-overlay">
-        <div id="plyr-loading-overlay" class="plyr-loading-overlay">
-          <div style="text-align: center">
-            <div class="plyr-spinner"></div>
-            <div class="plyr-loading-text">Loading video player...</div>
-          </div>
-        </div>
-        <video
-          id="player"
-          class="hidden-until-plyr video-player-tag"
-          controls
-          crossorigin
-          playsinline
-          preload="metadata"
-          width="850"
-          autoplay
-        ></video>
-      </div>
-    </div>
     <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
     <script src="../libs/player.js"></script>
     <script>

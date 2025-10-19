@@ -1,3 +1,6 @@
+* {
+  box-sizing: border-box;
+}
 body {
   background: #181818;
   color: #fff;
@@ -24,12 +27,12 @@ body {
   overflow: hidden;
   box-shadow: 0 2px 12px #0008;
   background: #000;
-  min-height: 480px;
 }
 .video-container-tag {
   position: relative;
   width: 100%;
   height: 100%;
+  aspect-ratio: 16/9;
 }
 .video-player-tag {
   background: #000;
@@ -100,7 +103,19 @@ body {
   min-height: 480px;
   display: none;
 }
-
+.footer {
+  text-align: center;
+  margin-top: 32px;
+  color: #aaa;
+  font-size: 1rem;
+}
+.footer a {
+  color: #d15454;
+  text-decoration: none;
+}
+.footer a:hover {
+  color: #722c2c;
+}
 /* Download Progress Bar */
 .progress-container {
   width: 100%;
@@ -205,16 +220,6 @@ h1 {
   margin-top: 20px;
   font-size: 1.1em;
   text-align: center;
-}
-#step-debug {
-  color: #ffe082;
-  background: #333;
-  padding: 8px;
-  margin: 16px 0 0 0;
-  text-align: center;
-  border-radius: 6px;
-  font-size: 0.95em;
-  display: none;
 }
 .hidden-until-plyr {
   visibility: hidden;
