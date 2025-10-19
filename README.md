@@ -94,10 +94,6 @@ Open your browser to [http://localhost:3000](http://localhost:3000)
 - No need to edit `app.js` to change torrents—just use the `?url=` parameter in `/player`.
 - Place additional static assets (fonts, JS, CSS) in `/libs/` as needed.
 
-## Developer
-
-Created with ❤️ by [wdallo](https://github.com/wdallo)
-
 ## License
 
 MIT
