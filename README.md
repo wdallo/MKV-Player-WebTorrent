@@ -49,6 +49,7 @@ MKV-Player-WebTorrent/
 │   ├── subtitles-octopus-worker-legacy.js
 │   └── subtitles-octopus-worker.wasm
 ├── views/                  # EJS templates for UI and system info
+│   ├── index.ejs           # Home Page
 │   ├── player.ejs          # Main player UI
 │   └── sysinfo.ejs         # System info dashboard
 ```
