@@ -1,5 +1,9 @@
 // Video streaming controller
-import { getOrAddTorrent, destroyTorrent } from "../services/torrentService.js";
+import {
+  getOrAddTorrent,
+  destroyTorrent,
+  extendAutoDelete,
+} from "../services/torrentService.js";
 import { rm } from "fs/promises";
 
 const MIN_READY_BYTES = 256 * 1024; // 256KB for ultra-fast start
@@ -13,6 +17,10 @@ export function streamVideo(req, res) {
     console.warn("[VIDEO] Missing url param");
     return res.status(400).send("Missing url param");
   }
+
+  // Extend auto-delete timer when video is accessed
+  extendAutoDelete(magnet);
+
   const state = getOrAddTorrent(magnet);
   if (!state || !state.videoFile) {
     console.warn(`[VIDEO] Video not ready for magnet: ${magnet}`);
@@ -121,22 +129,72 @@ export function streamVideo(req, res) {
   });
   stream.pipe(res);
 }
-
 // Handles cleanup: destroys torrent and deletes downloaded files
 export async function goodbye(req, res) {
-  const magnet = req.query.url;
-  // Always destroy the torrent first
+  console.log("=== GOODBYE ENDPOINT CALLED ===");
+  console.log("Request method:", req.method);
+  console.log("Request query:", req.query);
+  console.log("Request body:", req.body);
+
+  let magnet = req.query.url;
+  if (!magnet && req.body && req.body.url) {
+    magnet = req.body.url;
+  }
+  console.log("GOODBYE called with magnet:", magnet);
+
+  if (!magnet) {
+    console.log("No magnet provided");
+    return res.status(400).send("Missing magnet URL");
+  }
+
   const torrentPath = destroyTorrent(magnet);
+  console.log("Torrent path to delete:", torrentPath);
+
+  // Always instruct client to clear localStorage for this magnet
+  const shouldClearLocalStorage = true;
+
   if (torrentPath) {
     try {
-      // Recursively delete the torrent's files/folder
       await rm(torrentPath, { recursive: true, force: true });
-      res.status(200).send("Torrent destroyed and files deleted");
+      console.log("Successfully deleted:", torrentPath);
+      res.status(200).json({
+        success: true,
+        message: "Torrent destroyed and files deleted",
+        shouldClearLocalStorage,
+        magnet,
+      });
     } catch (err) {
       console.error("Failed to delete files:", err);
-      res.status(500).send("Torrent destroyed, but failed to delete files");
+      res.status(500).json({
+        success: false,
+        message: "Torrent destroyed, but failed to delete files",
+        shouldClearLocalStorage,
+        magnet,
+      });
     }
   } else {
-    res.status(200).send("Torrent destroyed (no files to delete)");
+    console.log("No torrent path found for magnet");
+    res.status(200).json({
+      success: true,
+      message: "Torrent destroyed (no files to delete)",
+      shouldClearLocalStorage,
+      magnet,
+    });
   }
+}
+
+// Clean localStorage for a specific magnet URL
+export function cleanLocalStorage(req, res) {
+  const magnet = req.query.url || req.body?.url;
+
+  if (!magnet) {
+    return res.status(400).json({ error: "Missing magnet URL" });
+  }
+
+  // Return the magnet URL so client can clean its localStorage
+  res.json({
+    success: true,
+    magnet: magnet,
+    message: "LocalStorage cleanup requested",
+  });
 }
