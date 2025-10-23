@@ -21,12 +21,33 @@ try {
           // File was deleted, try to find and remove torrent
           for (const [magnet, state] of Object.entries(torrents)) {
             if (state.videoFile && state.videoFile.name === filename) {
+              console.log(
+                `File deleted: ${filename}, cleaning up torrent data`
+              );
+
+              // Remove torrent from client
               if (state.torrent) {
                 client.remove(magnet, () => {
-                  // Optionally log or handle callback
+                  console.log(`Torrent removed for deleted file: ${filename}`);
                 });
               }
-              delete torrents[magnet];
+
+              // Clear auto-delete timer if it exists
+              if (state.deleteTimer) {
+                clearTimeout(state.deleteTimer);
+                console.log(`Cleared auto-delete timer for: ${filename}`);
+              }
+
+              // Mark this torrent as deleted so frontend can clean localStorage
+              state.fileDeleted = true;
+              state.deletedAt = Date.now();
+
+              // Keep the state briefly so frontend can detect deletion and clean localStorage
+              setTimeout(() => {
+                delete torrents[magnet];
+                console.log(`Torrent state cleaned up for: ${filename}`);
+              }, 5000); // 5 seconds for frontend to detect
+
               break;
             }
           }
@@ -52,8 +73,11 @@ const client = new WebTorrent({
 });
 
 // Store all active torrents and their state
-// Structure: magnet -> { torrent, videoFile, videoMime, lastAccess }
+// Structure: magnet -> { torrent, videoFile, videoMime, lastAccess, deleteTimer }
 const torrents = {};
+
+// Auto-delete configuration
+const AUTO_DELETE_DELAY = 72 * 60 * 60 * 1000; // 72 hours in milliseconds
 
 /**
  * Get or add a torrent to the client.
@@ -93,7 +117,28 @@ function getOrAddTorrent(magnet, cb) {
     videoFile: null,
     videoMime: "video/mp4",
     lastAccess: Date.now(),
+    deleteTimer: null,
   };
+
+  // Set up auto-delete timer (72 hours)
+  const setupAutoDelete = (magnetUri) => {
+    const timer = setTimeout(() => {
+      console.log(`Auto-deleting torrent after 72 hours: ${magnetUri}`);
+      const torrentPath = destroyTorrent(magnetUri);
+      if (torrentPath) {
+        import("fs").then(({ rm }) => {
+          rm(torrentPath, { recursive: true, force: true })
+            .then(() => console.log(`Auto-deleted: ${torrentPath}`))
+            .catch((err) => console.error(`Failed to auto-delete: ${err}`));
+        });
+      }
+    }, AUTO_DELETE_DELAY);
+
+    torrents[magnetUri].deleteTimer = timer;
+    console.log(`Auto-delete scheduled for ${magnetUri} in 72 hours`);
+  };
+
+  setupAutoDelete(magnet);
   // Add torrent to client
   torrents[magnet].torrent = client.add(
     magnet,
@@ -121,18 +166,65 @@ function getOrAddTorrent(magnet, cb) {
 }
 
 /**
- * Destroy a torrent and remove it from the client and memory.
+ * Destroys a torrent and returns its path for cleanup
  * @param {string} magnet - Magnet URI
  */
 function destroyTorrent(magnet) {
-  if (!magnet || !torrents[magnet]) return;
+  if (!magnet || !torrents[magnet]) return null;
   const state = torrents[magnet];
+  let torrentPath = null;
+
+  // Clear auto-delete timer if it exists
+  if (state.deleteTimer) {
+    clearTimeout(state.deleteTimer);
+    console.log("Cleared auto-delete timer for:", magnet);
+  }
+
   if (state.torrent) {
+    // Get the path before destroying
+    torrentPath = state.torrent.path;
+    console.log("Destroying torrent at path:", torrentPath);
+
     client.remove(magnet, () => {
-      // Optionally log or handle callback
+      console.log("Torrent removed from client");
     });
   }
+
+  // Clean up the state
   delete torrents[magnet];
+
+  return torrentPath;
 }
 
-export { client, torrents, getOrAddTorrent, destroyTorrent };
+/**
+ * Extend auto-delete timer for a torrent (reset to 72 hours from now)
+ * @param {string} magnet - Magnet URI
+ */
+function extendAutoDelete(magnet) {
+  if (!magnet || !torrents[magnet]) return;
+
+  const state = torrents[magnet];
+
+  // Clear existing timer
+  if (state.deleteTimer) {
+    clearTimeout(state.deleteTimer);
+  }
+
+  // Set new timer
+  const timer = setTimeout(() => {
+    console.log(`Auto-deleting torrent after 72 hours: ${magnet}`);
+    const torrentPath = destroyTorrent(magnet);
+    if (torrentPath) {
+      import("fs").then(({ rm }) => {
+        rm(torrentPath, { recursive: true, force: true })
+          .then(() => console.log(`Auto-deleted: ${torrentPath}`))
+          .catch((err) => console.error(`Failed to auto-delete: ${err}`));
+      });
+    }
+  }, AUTO_DELETE_DELAY);
+
+  state.deleteTimer = timer;
+  console.log(`Auto-delete timer extended for ${magnet} (72 hours from now)`);
+}
+
+export { client, torrents, getOrAddTorrent, destroyTorrent, extendAutoDelete };

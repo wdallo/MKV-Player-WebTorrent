@@ -11,6 +11,17 @@ export function getStatus(req, res) {
   if (!state || !state.torrent) {
     return res.status(404).json({ error: "Torrent not found" });
   }
+
+  // Check if file was deleted externally
+  if (state.fileDeleted) {
+    return res.json({
+      status: "file_deleted",
+      fileDeleted: true,
+      deletedAt: state.deletedAt,
+      error: "File was deleted from disk",
+    });
+  }
+
   const t = state.torrent;
   let status = "unknown";
   // Determine torrent status

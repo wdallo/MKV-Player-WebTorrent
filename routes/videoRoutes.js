@@ -1,9 +1,14 @@
 import express from "express";
-import { goodbye, streamVideo } from "../controllers/videoController.js";
+import {
+  goodbye,
+  streamVideo,
+  cleanLocalStorage,
+} from "../controllers/videoController.js";
 
 const router = express.Router();
 
 router.get("/video", streamVideo);
-router.get("/goodbye", goodbye);
+router.post("/goodbye", goodbye);
+router.post("/clean-localstorage", cleanLocalStorage);
 
 export default router;

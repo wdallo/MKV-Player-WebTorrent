@@ -16,7 +16,12 @@ const CONFIG = {
   STALL_TIMEOUT: 20000, // Time (ms) to wait before considering torrent stalled (no peers)
   WATERMARK: false, // Show watermark on player if true
   WATERMARK_CONTENT: "Demo Watermark", // Text to display as watermark on video
+  MANUAL_CLEANUP: false, // Enable immediate cleanup when player is closed/navigated away
+  AUTO_DELETE_HOURS: 72, // Hours after which unused torrents are automatically deleted
 };
+
+// Make CONFIG available globally for UI access
+window.CONFIG = CONFIG;
 
 // Type definitions (for better code documentation)
 /**
@@ -75,6 +80,9 @@ class UIController {
     if (!data) {
       this.elements.progressBar.style.width = "0%";
       this.elements.statusDetails.innerHTML = "&nbsp;";
+      // Show progress bar container if hidden
+      if (this.elements.progressBar.parentElement)
+        this.elements.progressBar.parentElement.style.display = "";
       return;
     }
 
@@ -92,6 +100,18 @@ class UIController {
 
     this.elements.progressBar.style.width = `${percentage}%`;
     this.elements.statusDetails.innerHTML = message;
+
+    // Hide progress bar and status when download is complete
+    if (data.status === "done") {
+      if (this.elements.progressBar.parentElement)
+        this.elements.progressBar.parentElement.style.display = "none";
+      this.elements.statusDetails.style.display = "none";
+    } else {
+      // Show them if not done
+      if (this.elements.progressBar.parentElement)
+        this.elements.progressBar.parentElement.style.display = "";
+      this.elements.statusDetails.style.display = "";
+    }
   }
 
   // Formats the status message for the user
@@ -473,6 +493,7 @@ class VideoPlayerController {
     this.playerStarted = false;
     this.plyrInstance = null;
     this.subtitlesLoaded = false; // Track if subtitles are loaded
+    this.hasSeenDownloadProgress = false; // Track if we've seen any download progress
 
     // Show/hide watermark based on config
     const watermark = document.querySelector(".video-watermark");
@@ -488,6 +509,26 @@ class VideoPlayerController {
 
     // Initialize fullscreen controller
     this.fullscreenController = new FullscreenController();
+
+    // Listen for localStorage changes from other tabs/windows
+    this.setupCrossTabCleanup();
+  }
+
+  // Setup cross-tab localStorage cleanup detection
+  setupCrossTabCleanup() {
+    window.addEventListener("storage", (e) => {
+      // Check if our specific keys were removed by another tab
+      if (e.key === this.playerReadyKey && e.newValue === null) {
+        console.log(
+          "Another tab cleaned up this magnet, cleaning up localStorage"
+        );
+        this.clearLocalStorageData();
+        this.ui.showError(
+          "Files were deleted from another tab. Please reload."
+        );
+        this.statusPoller.stop();
+      }
+    });
   }
 
   // Bind UI and video events
@@ -527,8 +568,24 @@ class VideoPlayerController {
       }
     });
 
-    // Cleanup on page leave
-    window.addEventListener("pagehide", () => this.cleanup());
+    // Cleanup on page leave - multiple events to ensure it triggers (if manual cleanup is enabled)
+    if (CONFIG.MANUAL_CLEANUP) {
+      const cleanupAll = () => {
+        this.cleanup();
+        // Also clean localStorage for this magnet globally
+        window.cleanLocalStorageForMagnet?.(this.magnetUrl);
+      };
+      window.addEventListener("beforeunload", cleanupAll);
+      window.addEventListener("pagehide", cleanupAll);
+      window.addEventListener("unload", cleanupAll);
+      console.log(
+        "Manual cleanup enabled - files will be deleted when player is closed"
+      );
+    } else {
+      console.log(
+        `Manual cleanup disabled - files will auto-delete after ${CONFIG.AUTO_DELETE_HOURS} hours`
+      );
+    }
   }
 
   // Check if player was previously marked as ready (for fast reload)
@@ -632,6 +689,39 @@ class VideoPlayerController {
   // Handle status updates from the poller
   handleStatusUpdate(data, errorMsg) {
     if (data) {
+      // Check if file was deleted externally
+      if (data.fileDeleted) {
+        console.log("File was deleted externally, cleaning up localStorage");
+        this.clearLocalStorageData();
+        this.ui.showError(
+          "Video file was deleted. Please reload with a new torrent."
+        );
+        this.statusPoller.stop();
+        return;
+      }
+
+      // Check if download is starting from zero (fresh download)
+      if (
+        data.status === "downloading" &&
+        data.progress === 0 &&
+        data.downloaded === 0 &&
+        !this.hasSeenDownloadProgress
+      ) {
+        console.log("=== FRESH DOWNLOAD DETECTED ===");
+        console.log("Status:", data.status);
+        console.log("Progress:", data.progress);
+        console.log("Downloaded:", data.downloaded);
+        console.log("Has seen progress before:", this.hasSeenDownloadProgress);
+        console.log(
+          "Download starting from zero, clearing old localStorage data"
+        );
+        this.clearLocalStorageData();
+        this.hasSeenDownloadProgress = true;
+      } else if (data.downloaded > 0) {
+        // Mark that we've seen some progress
+        this.hasSeenDownloadProgress = true;
+      }
+
       this.ui.updateStatusBar(data);
 
       // Start player when downloading begins
@@ -672,8 +762,8 @@ class VideoPlayerController {
   // Handle video canplay event (ready to play)
   handleVideoCanPlay() {
     this.ui.hideLoading();
-    this.ui.showVideoContainer();
     this.ui.hidePlyrLoadingOverlay();
+    this.ui.showVideoContainer();
     this.ui.hideError();
     this.ui.hideRetryButton();
     this.ui.hideStep();
@@ -781,12 +871,136 @@ class VideoPlayerController {
 
   // Cleanup resources and notify server when leaving page
   cleanup() {
+    if (!CONFIG.MANUAL_CLEANUP) {
+      console.log("Manual cleanup is disabled - skipping immediate cleanup");
+      this.statusPoller.stop();
+      this.retryController.clearContinuousRetry();
+      this.subtitlesManager.dispose();
+      return;
+    }
+
+    console.log(
+      "Manual cleanup enabled - sending goodbye beacon for:",
+      this.magnetUrl
+    );
     this.statusPoller.stop();
     this.retryController.clearContinuousRetry();
     this.subtitlesManager.dispose();
 
     // Send goodbye beacon to server to clean up torrent/files
-    navigator.sendBeacon(`/goodbye?url=${encodeURIComponent(this.magnetUrl)}`);
+    // Use URL parameter instead of FormData for better compatibility
+    const encodedUrl = encodeURIComponent(this.magnetUrl);
+    const goodbyeUrl = `/goodbye?url=${encodedUrl}`;
+
+    // Try multiple approaches to ensure cleanup happens
+    try {
+      // Method 1: sendBeacon with URL parameter (preferred)
+      const sent = navigator.sendBeacon(goodbyeUrl);
+      console.log("SendBeacon result:", sent);
+
+      // Method 2: Fallback fetch with URL parameter and handle response
+      if (!sent) {
+        fetch(goodbyeUrl, {
+          method: "POST",
+          keepalive: true,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.shouldClearLocalStorage && data.magnet) {
+              this.clearLocalStorageData();
+            }
+          })
+          .catch((err) => console.log("Fetch cleanup failed:", err));
+      }
+    } catch (err) {
+      console.error("Cleanup beacon failed:", err);
+      // Method 3: Last resort - synchronous XHR with URL parameter
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", goodbyeUrl, false); // synchronous
+        xhr.send();
+        if (xhr.status === 200) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            if (response.shouldClearLocalStorage && response.magnet) {
+              console.log(
+                "Server requested localStorage cleanup for:",
+                response.magnet
+              );
+              this.clearLocalStorageData();
+            }
+          } catch (parseErr) {
+            console.log("Could not parse cleanup response");
+          }
+        }
+      } catch (xhrErr) {
+        console.error("XHR cleanup failed:", xhrErr);
+      }
+    }
+
+    // Clear localStorage data AFTER server cleanup
+    setTimeout(() => {
+      this.clearLocalStorageData();
+    }, 100);
+  }
+
+  // Clear localStorage data related to this torrent
+  clearLocalStorageData() {
+    try {
+      const removedKeys = [];
+
+      console.log("=== CLEARING LOCALSTORAGE ===");
+      console.log("Magnet URL:", this.magnetUrl);
+      console.log("Player Ready Key:", this.playerReadyKey);
+      console.log("Resume Time Key:", this.resumeTimeKey);
+
+      if (localStorage.getItem(this.playerReadyKey)) {
+        localStorage.removeItem(this.playerReadyKey);
+        removedKeys.push(this.playerReadyKey);
+        console.log("Removed playerReady key:", this.playerReadyKey);
+      }
+
+      if (localStorage.getItem(this.resumeTimeKey)) {
+        localStorage.removeItem(this.resumeTimeKey);
+        removedKeys.push(this.resumeTimeKey);
+        console.log("Removed resumeTime key:", this.resumeTimeKey);
+      }
+
+      // Look for keys that contain this exact magnet URL or its hash
+      const magnetHash = this.magnetUrl.split("btih:")[1]?.split("&")[0];
+      const keysToRemove = [];
+
+      console.log("Scanning localStorage for magnet-related keys...");
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          console.log(`Checking key: ${key}`);
+          if (
+            key.includes(this.magnetUrl) ||
+            (magnetHash && key.includes(magnetHash)) ||
+            key === this.playerReadyKey ||
+            key === this.resumeTimeKey
+          ) {
+            keysToRemove.push(key);
+            console.log(`Key marked for removal: ${key}`);
+          }
+        }
+      }
+
+      keysToRemove.forEach((key) => {
+        if (localStorage.getItem(key)) {
+          localStorage.removeItem(key);
+          removedKeys.push(key);
+          console.log(`Removed key: ${key}`);
+        }
+      });
+
+      console.log(`Total removed keys: ${removedKeys.length}`);
+      console.log("Removed keys:", removedKeys);
+      console.log("=== CLEANUP COMPLETE ===");
+    } catch (err) {
+      console.error("Failed to clear localStorage:", err);
+    }
   }
 }
 
@@ -857,3 +1071,87 @@ class FullscreenController {
     }
   }
 }
+
+/**
+ * Utility function to clean localStorage for any magnet URL
+ * Can be called from browser console: cleanLocalStorageForMagnet('magnet:?xt=...')
+ */
+window.cleanLocalStorageForMagnet = function (magnetUrl) {
+  if (!magnetUrl) {
+    console.error("Please provide a magnet URL");
+    return;
+  }
+
+  try {
+    console.log("=== GLOBAL CLEANUP FUNCTION ===");
+    console.log("Target magnet:", magnetUrl);
+
+    const removedKeys = [];
+    const magnetHash = magnetUrl.split("btih:")[1]?.split("&")[0];
+    const keysToRemove = [];
+
+    console.log("Extracted hash:", magnetHash);
+    console.log("Current localStorage size:", localStorage.length);
+
+    // Find all keys related to this magnet
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        console.log(`Checking key: ${key}`);
+        if (
+          key.includes(magnetUrl) ||
+          (magnetHash && key.includes(magnetHash))
+        ) {
+          keysToRemove.push(key);
+          console.log(`Key marked for removal: ${key}`);
+        }
+      }
+    }
+
+    console.log(`Found ${keysToRemove.length} keys to remove`);
+
+    // Remove all found keys
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key);
+      removedKeys.push(key);
+      console.log(`Removed key: ${key}`);
+    });
+
+    console.log(
+      `Cleaned ${removedKeys.length} localStorage keys for magnet:`,
+      magnetUrl
+    );
+    console.log("Removed keys:", removedKeys);
+    console.log("=== GLOBAL CLEANUP COMPLETE ===");
+    return { success: true, removedKeys };
+  } catch (err) {
+    console.error("Failed to clean localStorage:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Global cleanup notification system
+ * Allows server or other sources to trigger localStorage cleanup for all users
+ */
+window.notifyMagnetDeleted = function (magnetUrl) {
+  if (!magnetUrl) {
+    console.error("Please provide a magnet URL");
+    return;
+  }
+
+  console.log("Received notification that magnet was deleted:", magnetUrl);
+
+  // Clean localStorage for this magnet
+  const result = window.cleanLocalStorageForMagnet(magnetUrl);
+
+  // If we have an active player for this magnet, show error and stop
+  if (window.player && window.player.magnetUrl === magnetUrl) {
+    window.player.ui.showError(
+      "Files were deleted. Please reload with a new torrent."
+    );
+    window.player.statusPoller.stop();
+  }
+
+  return result;
+};
