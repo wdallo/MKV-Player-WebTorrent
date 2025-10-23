@@ -15,8 +15,17 @@ A modern Node.js/Express app for streaming MKV/MP4 video files directly from tor
 - CORS enabled for easy local development
 - Instant resource cleanup: Torrents are destroyed when the user closes the browser tab or deletes the file
 - Live system info: `/sysinfo` endpoint for real-time Node.js resource stats
-- The MKV Player now supports a configurable watermark overlay on the video player.
-- On the home page, you can paste a magnet URL to start streaming a video.
+- Configurable watermark overlay on the video player
+- Home page allows pasting a magnet URL to start streaming a video
+- Comprehensive localStorage cleanup: Automatic removal of all magnet-related localStorage keys when files are deleted, torrents are destroyed, or a fresh download starts
+- Manual cleanup utility: `window.cleanLocalStorageForMagnet(magnetUrl)` for browser console use
+- Global notification: `window.notifyMagnetDeleted(magnetUrl)` to trigger cleanup and UI update across all tabs
+- Cross-tab cleanup sync: Uses the `storage` event to ensure all open tabs clean up localStorage and update UI if a file is deleted elsewhere
+- Robust cleanup triggers: LocalStorage is only cleared after server confirms file deletion, or when a new download starts from zero
+- Improved loading overlay logic: Loading overlays are hidden as soon as the video is ready or any data is available
+- Configurable cleanup: `CONFIG.MANUAL_CLEANUP` controls whether cleanup happens on page close or only after server-side deletion
+- Debugging & diagnostics: Detailed console logging for all cleanup actions, including which keys are removed and why
+- Production-ready code: Debug/test functions and logs are gated behind `CONFIG.DEBUG_MODE` or removed for production builds
 
 ## Project Structure
 
