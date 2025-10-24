@@ -661,9 +661,52 @@ class VideoPlayerController {
             "settings",
             "fullscreen",
           ],
-          pip: false, // Explicitly disable PiP API
+          pip: false,
         });
         this.playerInitialized = true;
+
+        // === Add custom quality indicator to Plyr controls ===
+        setTimeout(() => {
+          const controlsBar = document.querySelector(".plyr__controls");
+          if (
+            controlsBar &&
+            !document.getElementById("plyr-quality-indicator")
+          ) {
+            const qualityIndicator = document.createElement("span");
+            qualityIndicator.id = "plyr-quality-indicator";
+            qualityIndicator.className = "plyr__quality-indicator";
+            qualityIndicator.textContent = "...";
+            qualityIndicator.style.margin = "0 0px";
+            qualityIndicator.style.color = "#fff";
+            qualityIndicator.style.fontWeight = "bold";
+            qualityIndicator.style.background = "none";
+            qualityIndicator.style.padding = "2px 8px";
+            qualityIndicator.style.borderRadius = "4px";
+            qualityIndicator.style.fontSize = "13px";
+            qualityIndicator.style.pointerEvents = "none";
+
+            const settingsBtn = controlsBar.querySelector(
+              '.plyr__control[aria-label="Settings"]'
+            );
+            if (settingsBtn) {
+              // Insert quality indicator after settings button
+              controlsBar.insertBefore(
+                qualityIndicator,
+                settingsBtn.nextSibling
+              );
+            } else {
+              const fullscreenBtn = controlsBar.querySelector(
+                '.plyr__control[aria-label="Fullscreen"]'
+              );
+              if (fullscreenBtn) {
+                // Insert quality indicator BEFORE fullscreen button
+                controlsBar.insertBefore(qualityIndicator, fullscreenBtn);
+              } else {
+                controlsBar.appendChild(qualityIndicator);
+              }
+            }
+          }
+        }, 0);
       }
 
       this.ui.elements.video.classList.remove("hidden-until-plyr");
@@ -812,6 +855,13 @@ class VideoPlayerController {
     } else {
       this.ui.hideResumeButton();
       this._pendingResumeTime = null;
+    }
+
+    // load video quality
+    const height = this.ui.elements.video.videoHeight;
+    const indicator = document.getElementById("plyr-quality-indicator");
+    if (indicator && height) {
+      indicator.textContent = `${height}p`;
     }
   }
 
