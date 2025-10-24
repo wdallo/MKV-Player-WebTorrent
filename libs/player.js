@@ -609,6 +609,10 @@ class VideoPlayerController {
 
   // Start the player, load video and subtitles, and initialize Plyr
   async startPlayer() {
+    // Prevent double initialization
+    if (this.playerStarted) return;
+    this.playerStarted = true;
+
     this.ui.showStep("Initializing player...");
 
     if (this.playerInitialized) {
@@ -652,6 +656,7 @@ class VideoPlayerController {
         this.plyrInstance = new Plyr(this.ui.elements.video, {
           captions: { active: true, update: true, language: "en" },
           controls: [
+            "play-large", // This shows the big play button in the center
             "play",
             "progress",
             "current-time",
@@ -665,7 +670,7 @@ class VideoPlayerController {
         });
         this.playerInitialized = true;
 
-        // === Add custom quality indicator to Plyr controls ===
+        // === custom quality indicator to Plyr controls ===
         setTimeout(() => {
           const controlsBar = document.querySelector(".plyr__controls");
           if (
@@ -685,25 +690,13 @@ class VideoPlayerController {
             qualityIndicator.style.fontSize = "13px";
             qualityIndicator.style.pointerEvents = "none";
 
-            const settingsBtn = controlsBar.querySelector(
-              '.plyr__control[aria-label="Settings"]'
+            const fullscreenBtn = controlsBar.querySelector(
+              '.plyr__control[aria-label="Fullscreen"]'
             );
-            if (settingsBtn) {
-              // Insert quality indicator after settings button
-              controlsBar.insertBefore(
-                qualityIndicator,
-                settingsBtn.nextSibling
-              );
+            if (fullscreenBtn) {
+              controlsBar.insertBefore(qualityIndicator, fullscreenBtn);
             } else {
-              const fullscreenBtn = controlsBar.querySelector(
-                '.plyr__control[aria-label="Fullscreen"]'
-              );
-              if (fullscreenBtn) {
-                // Insert quality indicator BEFORE fullscreen button
-                controlsBar.insertBefore(qualityIndicator, fullscreenBtn);
-              } else {
-                controlsBar.appendChild(qualityIndicator);
-              }
+              controlsBar.appendChild(qualityIndicator);
             }
           }
         }, 0);
