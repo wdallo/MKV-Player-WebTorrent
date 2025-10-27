@@ -219,9 +219,7 @@ Create a `.env` file in the root directory:
 PORT=3000                    # Server port (default: 3000)
 NODE_ENV=development         # Environment mode
 DEBUG=true                   # Enable debug logging
-MAX_TORRENT_CONNECTIONS=55   # WebTorrent max connections
-UPLOAD_RATE_LIMIT=0          # Upload rate limit (0 = unlimited)
-DOWNLOAD_RATE_LIMIT=0        # Download rate limit (0 = unlimited)
+
 ```
 
 ### Customization Options
