@@ -324,3 +324,18 @@ h1 {
   border-radius: 4px;
   font-size: 0.97em;
 }
+/* For Webkit browsers (Chrome, Edge, Safari) */
+#subtitle-selector-container::-webkit-scrollbar {
+  width: 8px;
+  background: #222;
+  border-radius: 8px;
+}
+
+#subtitle-selector-container::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 8px;
+}
+
+#subtitle-selector-container::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}

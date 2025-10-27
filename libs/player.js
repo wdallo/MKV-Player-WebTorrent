@@ -398,19 +398,353 @@ class ResourceLoader {
 }
 
 /**
- * Subtitles Manager - Handles subtitle initialization and updates
+ * Subtitles Manager - Handles subtitle initialization and updates with multi-track support
  */
 class SubtitlesManager {
-  constructor(videoElement) {
+  constructor(videoElement, magnetUrl) {
     this.videoElement = videoElement;
+    this.magnetUrl = magnetUrl;
     this.initialized = false;
     this.octopus = null;
     this.lastSubtitleContent = "";
     this.pollInterval = null;
     this.subtitlesUrl = null;
+    this.availableTracks = [];
+    this.currentTrack = 0;
+    this.subtitleSelector = null;
+    this.userSelectedTrack = null;
   }
 
-  // Initialize subtitles rendering (ASS/SSA)
+  // Fetch available subtitle tracks from the server
+  async fetchAvailableTracks() {
+    try {
+      const response = await fetch(
+        `/subtitle-tracks?url=${encodeURIComponent(this.magnetUrl)}`
+      );
+      if (response.ok) {
+        this.availableTracks = await response.json();
+
+        // Only create selector if it doesn't exist
+        if (!this.subtitleSelector) {
+          this.createSubtitleSelector();
+        } else {
+          this.updateSelectorDisplay();
+        }
+        return this.availableTracks;
+      } else {
+        console.log(
+          "Failed to fetch subtitle tracks, status:",
+          response.status
+        );
+      }
+    } catch (error) {
+      console.log("Failed to fetch subtitle tracks:", error);
+    }
+    return [];
+  }
+
+  // Create and show subtitle track selector UI
+  createSubtitleSelector() {
+    // Always show selector to allow users to disable subtitles
+    // Remove existing selector if any
+    this.removeSubtitleSelector();
+
+    // Create selector container
+    const selectorContainer = document.createElement("div");
+    selectorContainer.id = "subtitle-selector-container";
+    selectorContainer.style.cssText = `
+      position: absolute;
+      display: none;
+      bottom: 60px;
+      right: 20px;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 8px 0;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      min-width: 160px;
+      max-height: 200px;
+      overflow-y: auto;
+    `;
+
+    // Add track options or "No subtitles available" message
+    if (this.availableTracks.length === 0) {
+      const noSubsOption = document.createElement("div");
+      noSubsOption.style.cssText = `
+        padding: 8px 16px;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: not-allowed;
+      `;
+      noSubsOption.textContent = "No subtitles available";
+      selectorContainer.appendChild(noSubsOption);
+    } else {
+      // Add "None" option
+      const noneOption = document.createElement("div");
+      noneOption.style.cssText = `
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      `;
+      noneOption.innerHTML = `<span>None</span><span style="margin-left: 8px; opacity: 0.7;">✓</span>`;
+      noneOption.dataset.value = "none";
+
+      if (this.currentTrack === null) {
+        noneOption.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+        noneOption.querySelector("span:last-child").style.opacity = "1";
+      } else {
+        noneOption.querySelector("span:last-child").style.opacity = "0";
+      }
+
+      noneOption.addEventListener("mouseenter", () => {
+        if (this.currentTrack !== null) {
+          noneOption.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+        }
+      });
+      noneOption.addEventListener("mouseleave", () => {
+        if (this.currentTrack !== null) {
+          noneOption.style.backgroundColor = "transparent";
+        }
+      });
+      noneOption.addEventListener("click", () => {
+        this.switchTrack("none");
+        // Update selector UI after switching
+        setTimeout(() => {
+          this.createSubtitleSelector();
+        }, 0);
+        selectorContainer.style.display = "none";
+        // Remove forced controls class when closing selector
+        const controlsBar = document.querySelector(".plyr__controls");
+        if (controlsBar) controlsBar.classList.remove("plyr-controls-forced");
+      });
+      selectorContainer.appendChild(noneOption);
+
+      this.availableTracks.forEach((track, index) => {
+        const option = document.createElement("div");
+        option.style.cssText = `
+          padding: 8px 16px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        `;
+        option.innerHTML = `<span>${track.language} - ${track.title}</span><span style="margin-left: 8px; opacity: 0.7;">✓</span>`;
+        option.dataset.value = index;
+
+        if (this.currentTrack === index) {
+          option.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+          option.querySelector("span:last-child").style.opacity = "1";
+        } else {
+          option.querySelector("span:last-child").style.opacity = "0";
+        }
+
+        option.addEventListener("mouseenter", () => {
+          if (this.currentTrack !== index) {
+            option.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+          }
+        });
+        option.addEventListener("mouseleave", () => {
+          if (this.currentTrack !== index) {
+            option.style.backgroundColor = "transparent";
+          }
+        });
+        option.addEventListener("click", () => {
+          this.switchTrack(index.toString());
+          // Update selector UI after switching
+          setTimeout(() => {
+            this.createSubtitleSelector();
+          }, 0);
+          selectorContainer.style.display = "none";
+          // Remove forced controls class when closing selector
+          const controlsBar = document.querySelector(".plyr__controls");
+          if (controlsBar) controlsBar.classList.remove("plyr-controls-forced");
+        });
+        selectorContainer.appendChild(option);
+      });
+    }
+
+    const videoContainer = document.querySelector(".video-container-tag");
+    if (videoContainer) {
+      videoContainer.appendChild(selectorContainer);
+    } else {
+      console.log(
+        "Video container not found! Looking for .video-container-tag"
+      );
+      // Try alternative container
+      const altContainer =
+        document.querySelector("#video-container") ||
+        document.querySelector(".plyr");
+      if (altContainer) {
+        altContainer.appendChild(selectorContainer);
+      } else {
+        console.log("No suitable container found for subtitle selector");
+      }
+    }
+  }
+
+  // Remove subtitle selector UI
+  removeSubtitleSelector() {
+    const existing = document.getElementById("subtitle-selector-container");
+    if (existing) {
+      existing.remove();
+    }
+  }
+
+  // Update the selector to reflect current track
+  updateSelectorDisplay() {
+    if (this.subtitleSelector) {
+      if (this.currentTrack === null) {
+        this.subtitleSelector.value = "none";
+      } else {
+        this.subtitleSelector.value = this.currentTrack.toString();
+      }
+    }
+  }
+
+  // Switch to a different subtitle track
+  async switchTrack(trackValue) {
+    // Show loading overlay with black background
+    const video = this.videoElement;
+    if (video) {
+      video.pause();
+      video.classList.add("blurred-for-subtitles-loading");
+    }
+    let overlay = document.getElementById("subtitles-loading-overlay");
+    const plyrContainer =
+      document.querySelector(".plyr") ||
+      document.getElementById("video-container");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "subtitles-loading-overlay";
+      overlay.style.position = "absolute";
+      overlay.style.top = "0";
+      overlay.style.left = "0";
+      overlay.style.width = "100%";
+      overlay.style.height = "100%";
+      overlay.style.background = "rgba(17, 17, 17, 0.5)";
+      overlay.style.zIndex = "99999";
+      overlay.style.display = "flex";
+      overlay.style.flexDirection = "column";
+      overlay.style.alignItems = "center";
+      overlay.style.justifyContent = "center";
+      overlay.innerHTML = `<div style='width:64px;height:64px;border-radius:12px;background:none;display:flex;align-items:center;justify-content:center;'></div><div style='margin-top:24px;color:#fff;font-size:22px;'>Loading subtitles...</div>`;
+      if (plyrContainer) {
+        plyrContainer.appendChild(overlay);
+      } else {
+        document.body.appendChild(overlay);
+      }
+    } else {
+      overlay.style.display = "flex";
+    }
+    if (!document.getElementById("subtitles-spinner-style")) {
+      const style = document.createElement("style");
+      style.id = "subtitles-spinner-style";
+      style.innerHTML = `.blurred-for-subtitles-loading {  filter: blur(6px) brightness(0.7); }`;
+      document.head.appendChild(style);
+    }
+    // Always fully dispose previous SubtitlesOctopus instance and remove canvas
+    if (this.octopus) {
+      try {
+        this.octopus.dispose();
+      } catch (e) {}
+      this.octopus = null;
+    }
+    this.initialized = false;
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    }
+    const oldCanvas = document.querySelector(".libassjs-canvas");
+    if (oldCanvas) oldCanvas.remove();
+
+    if (trackValue === "none") {
+      this.currentTrack = null;
+      this.userSelectedTrack = null;
+      this.updateSelectorDisplay();
+      // No subtitles: ensure disposed and canvas removed
+      this.dispose();
+      const octopusCanvas = document.querySelector(".libassjs-canvas");
+      if (octopusCanvas) octopusCanvas.remove();
+      // Hide overlay and remove blur after switching to "none"
+      if (overlay) overlay.style.display = "none";
+      if (video) video.classList.remove("blurred-for-subtitles-loading");
+      if (video && video.paused) video.play();
+      return;
+    }
+
+    // Parse and validate track index
+    // Only declare variables once
+
+    var trackIndex = parseInt(trackValue, 10);
+    if (isNaN(trackIndex) || trackIndex >= this.availableTracks.length) {
+      // Hide overlay and remove blur if invalid track
+      if (overlay) overlay.style.display = "none";
+      if (video) video.classList.remove("blurred-for-subtitles-loading");
+      if (video && video.paused) video.play();
+      return;
+    }
+
+    this.currentTrack = trackIndex;
+    this.userSelectedTrack = trackIndex;
+    this.updateSelectorDisplay();
+
+    var subtitlesUrl = `/subtitles?url=${encodeURIComponent(
+      this.magnetUrl
+    )}&track=${trackIndex}`;
+
+    try {
+      // Wait a bit before first request to ensure subtitles are ready
+      await new Promise((res) => setTimeout(res, 500));
+
+      // Repeatedly request subtitles until loaded
+      let loaded = false;
+      let attempts = 0;
+      while (!loaded && attempts < 20) {
+        attempts++;
+        try {
+          const response = await fetch(subtitlesUrl, { cache: "no-store" });
+          if (response.ok) {
+            const subtitleContent = await response.text();
+            if (
+              subtitleContent &&
+              subtitleContent.length > 10 &&
+              subtitleContent.indexOf("[Script Info]") !== -1
+            ) {
+              this.dispose();
+              const canvas = document.querySelector(".libassjs-canvas");
+              if (canvas) canvas.remove();
+              await this.initialize(subtitleContent, subtitlesUrl);
+              this.updateSelectorDisplay();
+              loaded = true;
+              break;
+            }
+          }
+        } catch (err) {
+          // Ignore and retry
+        }
+        await new Promise((res) => setTimeout(res, 1000));
+      }
+      // Hide overlay and remove blur after loading
+      if (overlay) overlay.style.display = "none";
+      if (video) video.classList.remove("blurred-for-subtitles-loading");
+      if (video && video.paused) video.play();
+    } catch (error) {
+      console.error("Failed to load subtitle track:", error);
+      // Hide overlay and remove blur on error
+      if (overlay) overlay.style.display = "none";
+      if (video) video.classList.remove("blurred-for-subtitles-loading");
+      if (video && video.paused) video.play();
+    }
+  }
+
+  // Initialize subtitles rendering (ASS/SSA) with track support
   async initialize(subtitleContent, subtitlesUrl) {
     this.subtitlesUrl = subtitlesUrl;
     this.lastSubtitleContent = subtitleContent;
@@ -425,7 +759,7 @@ class SubtitlesManager {
         video: this.videoElement,
         subContent: subtitleContent,
         workerUrl: "/libs/subtitles-octopus-worker.js",
-        fonts: [],
+        fonts: ["/libs/ARIALBD.TTF", "/libs/NotoSansJP-Bold.ttf"],
         fallbackFont: "/libs/ARIALBD.TTF",
         renderMode: "wasm-blend",
         targetFps: 24,
@@ -442,14 +776,22 @@ class SubtitlesManager {
     if (this.pollInterval) return;
     this.pollInterval = setInterval(async () => {
       if (!this.subtitlesUrl) return;
+      // Don't auto-reload if user has manually selected a track
+      if (this.userSelectedTrack !== null) return;
       try {
         const response = await fetch(this.subtitlesUrl, { cache: "no-store" });
         if (response.status === 200) {
           const newContent = await response.text();
           if (newContent.length > this.lastSubtitleContent.length) {
-            // Dispose and re-init with new content
-            this.dispose();
-            this.initialize(newContent, this.subtitlesUrl);
+            // Only reload if the current track is still selected and no user selection
+            if (
+              this.subtitleSelector &&
+              this.subtitleSelector.value === String(this.currentTrack) &&
+              this.userSelectedTrack === null
+            ) {
+              this.dispose();
+              this.initialize(newContent, this.subtitlesUrl);
+            }
           }
         }
       } catch (e) {
@@ -470,6 +812,12 @@ class SubtitlesManager {
       this.pollInterval = null;
     }
   }
+
+  // Clean up all subtitle-related UI and resources
+  cleanup() {
+    this.dispose();
+    this.removeSubtitleSelector();
+  }
 }
 
 /**
@@ -486,7 +834,10 @@ class VideoPlayerController {
     this.retryController = new RetryController();
     this.statusPoller = new StatusPoller(magnetUrl);
     this.resourceLoader = new ResourceLoader();
-    this.subtitlesManager = new SubtitlesManager(this.ui.elements.video);
+    this.subtitlesManager = new SubtitlesManager(
+      this.ui.elements.video,
+      magnetUrl
+    );
 
     // State
     this.playerInitialized = false;
@@ -635,7 +986,6 @@ class VideoPlayerController {
       const subtitlesUrl = `/subtitles?url=${encodeURIComponent(
         this.magnetUrl
       )}`;
-
       this.ui.showStep("Loading video and subtitles...");
 
       const [videoSrc, subtitleContent] = await Promise.all([
@@ -699,22 +1049,92 @@ class VideoPlayerController {
               controlsBar.appendChild(qualityIndicator);
             }
           }
+          // === Add subtitles section button ===
+          if (controlsBar && !document.getElementById("plyr-subtitles-btn")) {
+            const subtitlesBtn = document.createElement("button");
+            subtitlesBtn.id = "plyr-subtitles-btn";
+            subtitlesBtn.className = "plyr__control plyr__subtitles-btn";
+            subtitlesBtn.type = "button";
+            subtitlesBtn.setAttribute("aria-label", "Subtitles");
+            subtitlesBtn.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <g id="cc">
+    <path fill="#ffffffff" d="M14,23H6a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H6a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"/>
+    <path fill="#ffffffff" d="M28,23H20a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H20a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"/>
+  </g>
+</svg>`;
+            subtitlesBtn.style.margin = "0 8px";
+            subtitlesBtn.style.background = "none";
+            subtitlesBtn.style.border = "none";
+            subtitlesBtn.style.cursor = "pointer";
+            subtitlesBtn.style.display = "inline-flex";
+            subtitlesBtn.style.alignItems = "center";
+            subtitlesBtn.style.justifyContent = "center";
+            subtitlesBtn.style.padding = "2px 0px";
+            subtitlesBtn.style.borderRadius = "4px";
+            subtitlesBtn.style.color = "#fff";
+            // Add blue hover effect to match Plyr settings button
+            subtitlesBtn.addEventListener("mouseenter", () => {
+              subtitlesBtn.style.background = "#03a9f4";
+              subtitlesBtn.style.color = "#fff";
+              subtitlesBtn.style.padding = "5px 5px 5px 5px";
+            });
+            subtitlesBtn.addEventListener("mouseleave", () => {
+              subtitlesBtn.style.background = "none";
+              subtitlesBtn.style.color = "#fff";
+            });
+            subtitlesBtn.addEventListener("click", () => {
+              // Toggle subtitle selector UI
+              const selector = document.getElementById(
+                "subtitle-selector-container"
+              );
+
+              if (selector) {
+                const isOpening = selector.style.display === "none";
+                selector.style.display = isOpening ? "" : "none";
+              }
+            });
+            // Insert before fullscreen button if present
+            const fullscreenBtn = controlsBar.querySelector(
+              '.plyr__control[aria-label="Fullscreen"]'
+            );
+            if (fullscreenBtn) {
+              controlsBar.insertBefore(subtitlesBtn, fullscreenBtn);
+            } else {
+              controlsBar.appendChild(subtitlesBtn);
+            }
+          }
         }, 0);
       }
 
       this.ui.elements.video.classList.remove("hidden-until-plyr");
 
+      // Fetch available subtitle tracks and create selector
+      await this.subtitlesManager.fetchAvailableTracks();
+
       // Initialize subtitles if available
       if (subtitleContent) {
-        await this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
-        this.subtitlesLoaded = true;
-        this.ui.showStep("SubtitlesOctopus initialized");
+        // Only initialize default if user hasn't manually selected a track
+        if (this.subtitlesManager.userSelectedTrack === null) {
+          await this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
+          this.subtitlesLoaded = true;
+          if (
+            this.subtitlesManager.currentTrack === undefined ||
+            this.subtitlesManager.currentTrack === null
+          ) {
+            this.subtitlesManager.currentTrack = 0;
+          }
+          this.ui.showStep("SubtitlesOctopus initialized");
+        }
       } else {
         this.subtitlesLoaded = false;
+        this.subtitlesManager.currentTrack = null;
         this.ui.showStep(
           "Subtitles not ready yet, will try again when video is ready"
         );
       }
+
+      // Create selector after determining subtitle state
+      this.subtitlesManager.createSubtitleSelector();
 
       this.ui.setStatusMessage("");
     } catch (error) {
@@ -743,14 +1163,6 @@ class VideoPlayerController {
         data.downloaded === 0 &&
         !this.hasSeenDownloadProgress
       ) {
-        console.log("=== FRESH DOWNLOAD DETECTED ===");
-        console.log("Status:", data.status);
-        console.log("Progress:", data.progress);
-        console.log("Downloaded:", data.downloaded);
-        console.log("Has seen progress before:", this.hasSeenDownloadProgress);
-        console.log(
-          "Download starting from zero, clearing old localStorage data"
-        );
         this.clearLocalStorageData();
         this.hasSeenDownloadProgress = true;
       } else if (data.downloaded > 0) {
@@ -808,21 +1220,38 @@ class VideoPlayerController {
 
     // Try to load subtitles if not loaded yet
     if (!this.subtitlesLoaded) {
-      const subtitlesUrl = `/subtitles?url=${encodeURIComponent(
-        this.magnetUrl
-      )}`;
-      this.resourceLoader
-        .pollUntilReady(subtitlesUrl, true)
-        .then((subtitleContent) => {
-          if (subtitleContent) {
-            this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
-            this.subtitlesLoaded = true;
-            this.ui.showStep("Subtitles loaded after video ready");
-          }
-        })
-        .catch(() => {
-          // Ignore if still not ready
-        });
+      // Fetch available tracks first, then load the first one
+      this.subtitlesManager.fetchAvailableTracks().then(() => {
+        const subtitlesUrl = `/subtitles?url=${encodeURIComponent(
+          this.magnetUrl
+        )}&track=0`;
+        this.resourceLoader
+          .pollUntilReady(subtitlesUrl, true)
+          .then((subtitleContent) => {
+            if (subtitleContent) {
+              this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
+              this.subtitlesLoaded = true;
+              // Only set currentTrack to 0 if it is undefined or null (initial load)
+              if (
+                this.subtitlesManager.currentTrack === undefined ||
+                this.subtitlesManager.currentTrack === null
+              ) {
+                this.subtitlesManager.currentTrack = 0;
+              }
+              this.ui.showStep("Subtitles loaded after video ready");
+            } else {
+              // No subtitles available
+              this.subtitlesManager.currentTrack = null;
+            }
+            // Create/update selector after determining subtitle state
+            this.subtitlesManager.createSubtitleSelector();
+          })
+          .catch(() => {
+            // Ignore if still not ready, but update selector
+            this.subtitlesManager.currentTrack = null;
+            this.subtitlesManager.createSubtitleSelector();
+          });
+      });
     }
   }
 
@@ -918,7 +1347,7 @@ class VideoPlayerController {
       console.log("Manual cleanup is disabled - skipping immediate cleanup");
       this.statusPoller.stop();
       this.retryController.clearContinuousRetry();
-      this.subtitlesManager.dispose();
+      this.subtitlesManager.cleanup();
       return;
     }
 
@@ -928,7 +1357,7 @@ class VideoPlayerController {
     );
     this.statusPoller.stop();
     this.retryController.clearContinuousRetry();
-    this.subtitlesManager.dispose();
+    this.subtitlesManager.cleanup();
 
     // Send goodbye beacon to server to clean up torrent/files
     // Use URL parameter instead of FormData for better compatibility
@@ -1054,7 +1483,9 @@ class FullscreenController {
   constructor() {
     this.watermark = document.querySelector(".video-watermark");
     this.resumeModule = document.getElementById("resume-module");
-
+    this.subtitleSelector = document.getElementById(
+      "subtitle-selector-container"
+    );
     this.bindEvents();
   }
 
@@ -1068,16 +1499,21 @@ class FullscreenController {
   // Handle fullscreen overlay positioning
   handleFullscreenOverlay() {
     const fsElement = document.fullscreenElement;
-
+    this.subtitleSelector = document.getElementById(
+      "subtitle-selector-container"
+    );
+    // Track if selector was open before fullscreen
+    const selectorWasOpen =
+      this.subtitleSelector && this.subtitleSelector.style.display !== "none";
     if (fsElement) {
-      this.enterFullscreen(fsElement);
+      this.enterFullscreen(fsElement, selectorWasOpen);
     } else {
-      this.exitFullscreen();
+      this.exitFullscreen(selectorWasOpen);
     }
   }
 
   // Configure elements for fullscreen mode
-  enterFullscreen(fsElement) {
+  enterFullscreen(fsElement, selectorWasOpen) {
     if (this.watermark) {
       fsElement.appendChild(this.watermark);
       this.watermark.style.position = "absolute";
@@ -1095,10 +1531,24 @@ class FullscreenController {
       this.resumeModule.style.height = "100%";
       this.resumeModule.style.zIndex = "10000";
     }
+    if (this.subtitleSelector) {
+      // Always append selector to fullscreen element
+      if (!fsElement.contains(this.subtitleSelector)) {
+        fsElement.appendChild(this.subtitleSelector);
+      }
+      this.subtitleSelector.style.zIndex = "2147483647";
+      // Restore display state if it was open before fullscreen
+      if (selectorWasOpen) {
+        this.subtitleSelector.style.display = "";
+        // Also force controls bar visible if selector is open
+        const controlsBar = document.querySelector(".plyr__controls");
+        if (controlsBar) controlsBar.classList.add("plyr-controls-forced");
+      }
+    }
   }
 
   // Restore elements to normal container when exiting fullscreen
-  exitFullscreen() {
+  exitFullscreen(selectorWasOpen) {
     const container = document.querySelector(".video-container-tag");
 
     if (container && this.watermark && !container.contains(this.watermark)) {
@@ -1111,6 +1561,25 @@ class FullscreenController {
       !container.contains(this.resumeModule)
     ) {
       container.appendChild(this.resumeModule);
+    }
+    if (
+      container &&
+      this.subtitleSelector &&
+      !container.contains(this.subtitleSelector)
+    ) {
+      container.appendChild(this.subtitleSelector);
+      this.subtitleSelector.style.zIndex = "9999";
+      // Restore display state if it was open before exiting fullscreen
+      if (selectorWasOpen) {
+        this.subtitleSelector.style.display = "";
+        // Also force controls bar visible if selector is open
+        const controlsBar = document.querySelector(".plyr__controls");
+        if (controlsBar) controlsBar.classList.add("plyr-controls-forced");
+      } else {
+        this.subtitleSelector.style.display = "none";
+        const controlsBar = document.querySelector(".plyr__controls");
+        if (controlsBar) controlsBar.classList.remove("plyr-controls-forced");
+      }
     }
   }
 }

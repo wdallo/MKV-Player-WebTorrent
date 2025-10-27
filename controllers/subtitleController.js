@@ -1,9 +1,58 @@
 // Subtitle streaming controller
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
+import ffprobe from "ffprobe";
+import ffprobeStatic from "ffprobe-static";
 import { getOrAddTorrent } from "../services/torrentService.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+// Endpoint to list all subtitle tracks in the MKV
+export async function listSubtitleTracks(req, res) {
+  const magnet = req.query.url;
+  if (!magnet) return res.status(400).send("Missing url param");
+  const state = getOrAddTorrent(magnet);
+  if (!state || !state.videoFile) {
+    res.status(503).send("Video is not ready yet. Please try again later.");
+    return;
+  }
+  const videoFile = state.videoFile;
+
+  // If not an MKV file, return empty tracks array
+  if (!videoFile.name.endsWith(".mkv")) {
+    res.json([]);
+    return;
+  }
+
+  try {
+    // Use the video stream URL instead of file path for WebTorrent
+    const videoUrl = `http://localhost:${
+      process.env.PORT || 3000
+    }/video?url=${encodeURIComponent(magnet)}`;
+
+    const info = await ffprobe(videoUrl, {
+      path: ffprobeStatic.path,
+      // Add timeout and connection options for streaming
+      timeout: 30000,
+    });
+
+    const tracks = info.streams
+      .filter((s) => s.codec_type === "subtitle")
+      .map((s, i) => ({
+        index: i,
+        language: s.tags?.language || "und",
+        title: s.tags?.title || `Subtitle ${i + 1}`,
+        codec: s.codec_name,
+      }));
+
+    console.log(`Found ${tracks.length} subtitle tracks:`, tracks);
+    res.json(tracks);
+  } catch (e) {
+    console.error("Failed to probe subtitles:", e.message);
+    // Return empty array instead of error to allow graceful fallback
+    res.json([]);
+  }
+}
 
 // Streams ASS/SSA subtitles extracted from MKV video or returns a fallback if not available
 export function streamAssSubtitles(req, res) {
@@ -35,13 +84,14 @@ export function streamAssSubtitles(req, res) {
     }
   };
   try {
-    // Use ffmpeg to extract the first subtitle stream as ASS from the video
+    // Use ffmpeg to extract the selected subtitle stream as ASS from the video
+    const trackIndex = req.query.track || 0;
     const videoUrl = `http://localhost:${
       process.env.PORT || 3000
     }/video?url=${encodeURIComponent(magnet)}`;
     ffmpegCommand = ffmpeg(videoUrl)
       .inputOptions(["-analyzeduration", "10M", "-probesize", "10M"])
-      .outputOptions(["-map 0:s:0?", "-f ass"])
+      .outputOptions([`-map 0:s:${trackIndex}?`, "-f ass"])
       .on("error", () => sendFallbackSubtitles("No subtitles found in video"))
       .on("end", () => {
         hasEnded = true;
@@ -144,12 +194,13 @@ export function streamVttSubtitles(req, res) {
     }
   };
   try {
+    const trackIndex = req.query.track || 0;
     const videoUrl = `http://localhost:${
       process.env.PORT || 3000
     }/video?url=${encodeURIComponent(magnet)}`;
     ffmpegCommand = ffmpeg(videoUrl)
       .inputOptions(["-analyzeduration", "10M", "-probesize", "10M"])
-      .outputOptions(["-map 0:s:0?", "-f webvtt"])
+      .outputOptions([`-map 0:s:${trackIndex}?`, "-f webvtt"])
       .on("error", () => {
         sendFallbackVtt("No subtitles found in video");
       })
