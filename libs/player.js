@@ -758,9 +758,9 @@ class SubtitlesManager {
       this.octopus = new window.SubtitlesOctopus({
         video: this.videoElement,
         subContent: subtitleContent,
-        workerUrl: "/libs/subtitles-octopus-worker.js",
-        fonts: ["/libs/ARIALBD.TTF", "/libs/NotoSansJP-Bold.ttf"],
-        fallbackFont: "/libs/ARIALBD.TTF",
+        workerUrl: "/libs/octopus/subtitles-octopus-worker.js",
+        fonts: ["/libs/fonts/ARIALBD.TTF", "/libs/fonts/NotoSansJP-Bold.ttf"],
+        fallbackFont: "/libs/fonts/ARIALBD.TTF",
         renderMode: "wasm-blend",
         targetFps: 24,
       });
