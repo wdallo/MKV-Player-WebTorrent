@@ -60,7 +60,6 @@ MKV-Player-WebTorrent/
 ├── 📂 controllers/               # Business logic controllers
 │   ├── playerController.js      # Player page rendering & config
 │   ├── statusController.js      # Torrent status & progress API
-│   ├── subtitleController.js    # Subtitle extraction & streaming
 │   └── videoController.js       # Video streaming & file serving
 │
 ├── 📂 routes/                    # Express route definitions
@@ -73,19 +72,22 @@ MKV-Player-WebTorrent/
 │   └── torrentService.js        # WebTorrent management & lifecycle
 │
 ├── 📂 libs/                      # Frontend assets & libraries
-│   ├── player.js                # Main player application (2000+ lines)
-│   ├── style.css                # Custom UI styles & responsive design
-│   ├── plyr.css                 # Plyr video player styles
-│   ├── ARIALBD.TTF              # Primary subtitle font
-│   ├── NotoSansJP-Bold.ttf      # Japanese subtitle font
-│   ├── subtitles-octopus.js     # ASS/SSA subtitle renderer
-│   ├── subtitles-octopus-worker.js
-│   ├── subtitles-octopus-worker-legacy.js
-│   └── subtitles-octopus-worker.wasm
+│   ├── player.js                # Main player application logic
+│   ├── 📂 styles/               # UI stylesheets
+│   │   ├── style.css            # Custom UI styles
+│   │   └── plyr.css             # Plyr video player styles
+│   ├── 📂 fonts/                # Subtitle font files
+│   │   ├── ARIALBD.TTF          # Subtitle font (Arial Bold)
+│   │   └── NotoSansJP-Bold.ttf  # Japanese subtitle font
+│   └── 📂 octopus/              # SubtitlesOctopus renderer
+│       ├── subtitles-octopus.js # ASS/SSA subtitle renderer
+│       ├── subtitles-octopus-worker.js
+│       ├── subtitles-octopus-worker-legacy.js
+│       └── subtitles-octopus-worker.wasm
 │
 ├── 📂 views/                     # EJS template files
-│   ├── index.ejs                # Home page with magnet input
-│   ├── player.ejs               # Main video player interface
+│   ├── index.ejs                # Home page template
+│   ├── player.ejs               # Video player interface
 │   └── sysinfo.ejs              # System monitoring dashboard
 │
 └── 📂 downloads/                 # Temporary torrent file storage
