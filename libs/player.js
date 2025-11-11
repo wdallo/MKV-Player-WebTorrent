@@ -587,6 +587,29 @@ class SubtitlesManager {
         console.log("No suitable container found for subtitle selector");
       }
     }
+
+    // Close selector when clicking outside
+    setTimeout(() => {
+      function handleOutsideClick(event) {
+        const selector = document.getElementById("subtitle-selector-container");
+        const ccBtn = document.getElementById("plyr-subtitles-btn");
+        if (
+          selector &&
+          selector.style.display !== "none" &&
+          !selector.contains(event.target) &&
+          (!ccBtn || !ccBtn.contains(event.target))
+        ) {
+          selector.style.display = "none";
+          // Restore CC button if you hide it when selector is open
+          if (ccBtn) ccBtn.style.display = "";
+          // Remove forced controls class
+          const controlsBar = document.querySelector(".plyr__controls");
+          if (controlsBar) controlsBar.classList.remove("plyr-controls-forced");
+          document.removeEventListener("mousedown", handleOutsideClick);
+        }
+      }
+      document.addEventListener("mousedown", handleOutsideClick);
+    }, 0);
   }
 
   // Remove subtitle selector UI
@@ -1667,3 +1690,21 @@ window.notifyMagnetDeleted = function (magnetUrl) {
 
   return result;
 };
+
+document.addEventListener("mousedown", function handleOutsideClick(event) {
+  const selector = document.getElementById("subtitle-selector-container");
+  const ccBtn = document.getElementById("plyr-subtitles-btn");
+  if (
+    selector &&
+    selector.style.display !== "none" &&
+    !selector.contains(event.target) &&
+    (!ccBtn || !ccBtn.contains(event.target))
+  ) {
+    selector.style.display = "none";
+    // Restore CC button if you hide it when selector is open
+    if (ccBtn) ccBtn.style.display = "";
+    // Remove forced controls class
+    const controlsBar = document.querySelector(".plyr__controls");
+    if (controlsBar) controlsBar.classList.remove("plyr-controls-forced");
+  }
+});
