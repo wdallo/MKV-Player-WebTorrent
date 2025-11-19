@@ -2,85 +2,111 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>System Info</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 2em;
-      }
-      table {
-        border-collapse: collapse;
-        width: 50%;
-      }
-      th,
-      td {
-        border: 1px solid #ccc;
-        padding: 8px;
-      }
-      th {
-        background: #f4f4f4;
-      }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>System Information - MKV Player</title>
+    <link rel="stylesheet" href="/libs/styles/style.css" />
   </head>
   <body>
-    <h1>System Information</h1>
-    <table>
-      <tr>
-        <th>PID</th>
-        <td><%= pid %></td>
-      </tr>
-      <tr>
-        <th>Platform</th>
-        <td><%= platform %></td>
-      </tr>
-      <tr>
-        <th>Node Version</th>
-        <td><%= nodeVersion %></td>
-      </tr>
-      <tr>
-        <th>Uptime (seconds)</th>
-        <td><%= uptime %></td>
-      </tr>
-    </table>
+    <div class="container">
+      <a href="/" class="back-btn">← Back to Home</a>
 
-    <h2>Memory Usage</h2>
-    <table>
-      <tr>
-        <th>Type</th>
-        <th>Bytes</th>
-      </tr>
-      <tr>
-        <td>RSS</td>
-        <td><%= memory.rss %></td>
-      </tr>
-      <tr>
-        <td>Heap Total</td>
-        <td><%= memory.heapTotal %></td>
-      </tr>
-      <tr>
-        <td>Heap Used</td>
-        <td><%= memory.heapUsed %></td>
-      </tr>
-      <tr>
-        <td>External</td>
-        <td><%= memory.external %></td>
-      </tr>
-      <tr>
-        <td>Array Buffers</td>
-        <td><%= memory.arrayBuffers %></td>
-      </tr>
-    </table>
+      <h1>System Information</h1>
 
-    <h2>CPU Usage</h2>
-    <table>
-      <tr>
-        <th>User</th>
-        <td><%= cpu.user %></td>
-      </tr>
-      <tr>
-        <th>System</th>
-        <td><%= cpu.system %></td>
-      </tr>
-    </table>
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="info-label">Process ID</div>
+          <div class="info-value"><%= pid %></div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Platform</div>
+          <div class="info-value"><%= platform %></div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Node Version</div>
+          <div class="info-value"><%= nodeVersion %></div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Uptime</div>
+          <div class="info-value"><%= Math.floor(uptime) %> seconds</div>
+        </div>
+      </div>
+
+      <h2>Memory Usage</h2>
+      <table class="sysinfo-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Raw Bytes</th>
+            <th>Human Readable</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RSS</td>
+            <td class="bytes-value"><%= memory.rss.toLocaleString() %></td>
+            <td class="bytes-value">
+              <%= formatBytes ? formatBytes(memory.rss) : (memory.rss / 1024 /
+              1024).toFixed(2) + ' MB' %>
+            </td>
+          </tr>
+          <tr>
+            <td>Heap Total</td>
+            <td class="bytes-value">
+              <%= memory.heapTotal.toLocaleString() %>
+            </td>
+            <td class="bytes-value">
+              <%= formatBytes ? formatBytes(memory.heapTotal) :
+              (memory.heapTotal / 1024 / 1024).toFixed(2) + ' MB' %>
+            </td>
+          </tr>
+          <tr>
+            <td>Heap Used</td>
+            <td class="bytes-value"><%= memory.heapUsed.toLocaleString() %></td>
+            <td class="bytes-value">
+              <%= formatBytes ? formatBytes(memory.heapUsed) : (memory.heapUsed
+              / 1024 / 1024).toFixed(2) + ' MB' %>
+            </td>
+          </tr>
+          <tr>
+            <td>External</td>
+            <td class="bytes-value"><%= memory.external.toLocaleString() %></td>
+            <td class="bytes-value">
+              <%= formatBytes ? formatBytes(memory.external) : (memory.external
+              / 1024 / 1024).toFixed(2) + ' MB' %>
+            </td>
+          </tr>
+          <tr>
+            <td>Array Buffers</td>
+            <td class="bytes-value">
+              <%= memory.arrayBuffers.toLocaleString() %>
+            </td>
+            <td class="bytes-value">
+              <%= formatBytes ? formatBytes(memory.arrayBuffers) :
+              (memory.arrayBuffers / 1024 / 1024).toFixed(2) + ' MB' %>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>CPU Usage</h2>
+      <table class="sysinfo-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Microseconds</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>User</td>
+            <td class="bytes-value"><%= cpu.user.toLocaleString() %> μs</td>
+          </tr>
+          <tr>
+            <td>System</td>
+            <td class="bytes-value"><%= cpu.system.toLocaleString() %> μs</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </body>
 </html>
