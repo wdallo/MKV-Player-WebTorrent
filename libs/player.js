@@ -844,6 +844,12 @@ class ResourceLoader {
   // Polls a resource URL until it is ready (HTTP 200)
   async pollUntilReady(url, isText = false) {
     for (let i = 0; i < CONFIG.RESOURCE_TIMEOUT; i++) {
+      // Show polling message
+      if (window.player && window.player.ui) {
+        window.player.ui.setStatusMessage(
+          `Polling for ${isText ? "subtitles" : "video"}... (attempt ${i + 1})`
+        );
+      }
       try {
         // Add timestamp for cache busting if URL doesn't already have one
         const urlToFetch = url.includes("_t=")
@@ -859,10 +865,11 @@ class ResourceLoader {
             Expires: "0",
           },
         });
-
-        if (response.status === 200) {
-          return isText ? await response.text() : url;
-        } else if (response.status === 503) {
+        const text = await response.text();
+        if (response.status === 200 && text !== "NOT_READY") {
+          // Resource is ready
+          return isText ? text : url;
+        } else if (response.status === 200 && text === "NOT_READY") {
           // Resource not ready yet, continue polling
         }
       } catch (error) {
