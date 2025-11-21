@@ -12,7 +12,7 @@ const PRIORITY_PIECES = 20; // Download first 20 pieces with priority
 // Streams video content for a given magnet link, supporting HTTP range requests
 export function streamVideo(req, res) {
   const magnet = req.query.url;
-  console.log(`[VIDEO] Request for video. Magnet: ${magnet}`);
+
   if (!magnet) {
     console.warn("[VIDEO] Missing url param");
     return res.status(400).send("Missing url param");
@@ -24,7 +24,7 @@ export function streamVideo(req, res) {
   const state = getOrAddTorrent(magnet);
   if (!state || !state.videoFile) {
     console.warn(`[VIDEO] Video not ready for magnet: ${magnet}`);
-    res.status(503).send("Video is not ready yet. Please try again later.");
+    res.status(200).send("NOT_READY");
     return;
   }
   const videoFile = state.videoFile;
@@ -50,16 +50,13 @@ export function streamVideo(req, res) {
       : false;
   // If more than 256KB is downloaded, allow streaming
   if (videoFile.downloaded >= MIN_READY_BYTES) {
-    console.log(
-      `[VIDEO] Allowing stream: downloaded=${videoFile.downloaded} bytes (>256KB)`
-    );
   } else if (videoFile.downloaded < MIN_READY_BYTES || !firstPieceDownloaded) {
     // Not enough data to start streaming
     console.log(
       `[VIDEO] Not enough data: downloaded=${videoFile.downloaded} bytes, need at least ${MIN_READY_BYTES} bytes for ${videoFile.name}`
     );
     console.log(`[VIDEO] First piece downloaded: ${!!firstPieceDownloaded}`);
-    res.status(503).send("Video is not ready yet. Please try again later.");
+    res.status(200).send("NOT_READY");
     return;
   }
   const range = req.headers.range;
@@ -78,6 +75,7 @@ export function streamVideo(req, res) {
     console.log(
       `[VIDEO] No range header. Sending downloaded part: 0-${end} (${chunkSize} bytes) of ${videoFile.name}`
     );
+
     res.setHeader("Content-Type", videoMime);
     res.setHeader("Content-Length", chunkSize);
     stream = videoFile.createReadStream({ start: 0, end });
@@ -97,21 +95,54 @@ export function streamVideo(req, res) {
   let end = parts[1] ? parseInt(parts[1], 10) : fileLength - 1;
   // Only serve up to downloaded bytes
   if (start > lastDownloadedByte) {
-    res.status(416).setHeader("Content-Range", `bytes */${fileLength}`);
-    res.end();
-    return;
+    const downloadPercentage = (videoFile.downloaded / fileLength) * 100;
+
+    // Be more lenient with range adjustments - allow at 80%+ instead of 90%+
+    if (downloadPercentage > 80 && start < fileLength) {
+      // Adjust the start to the nearest available byte
+      const adjustedStart = Math.min(start, lastDownloadedByte);
+      console.log(
+        `[VIDEO] Adjusting range: requested=${start}, serving from=${adjustedStart} (${downloadPercentage.toFixed(
+          1
+        )}% downloaded)`
+      );
+      end = Math.min(end, lastDownloadedByte);
+      const chunkSize = end - adjustedStart + 1;
+
+      if (chunkSize > 0) {
+        res.status(206);
+        res.setHeader(
+          "Content-Range",
+          `bytes ${adjustedStart}-${end}/${fileLength}`
+        );
+        res.setHeader("Accept-Ranges", "bytes");
+        res.setHeader("Content-Length", chunkSize);
+        res.setHeader("Content-Type", videoMime);
+        stream = videoFile.createReadStream({ start: adjustedStart, end });
+      } else {
+        // Still return 416 if no valid chunk available
+        res.status(416).setHeader("Content-Range", `bytes */${fileLength}`);
+        res.end();
+        return;
+      }
+    } else {
+      res.status(416).setHeader("Content-Range", `bytes */${fileLength}`);
+      res.end();
+      return;
+    }
+  } else {
+    end = Math.min(end, lastDownloadedByte);
+    const chunkSize = end - start + 1;
+    console.log(
+      `[VIDEO] Range request: ${start}-${end} (${chunkSize} bytes) for ${videoFile.name}`
+    );
+    res.status(206);
+    res.setHeader("Content-Range", `bytes ${start}-${end}/${fileLength}`);
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Content-Length", chunkSize);
+    res.setHeader("Content-Type", videoMime);
+    stream = videoFile.createReadStream({ start, end });
   }
-  end = Math.min(end, lastDownloadedByte);
-  const chunkSize = end - start + 1;
-  console.log(
-    `[VIDEO] Range request: ${start}-${end} (${chunkSize} bytes) for ${videoFile.name}`
-  );
-  res.status(206);
-  res.setHeader("Content-Range", `bytes ${start}-${end}/${fileLength}`);
-  res.setHeader("Accept-Ranges", "bytes");
-  res.setHeader("Content-Length", chunkSize);
-  res.setHeader("Content-Type", videoMime);
-  stream = videoFile.createReadStream({ start, end });
   console.log(`[VIDEO] Stream created for range: ${start}-${end}`);
   stream.on("error", (err) => {
     console.error("[VIDEO] Stream error (range):", err);

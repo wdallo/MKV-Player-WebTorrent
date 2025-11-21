@@ -13,7 +13,7 @@ export async function listSubtitleTracks(req, res) {
   if (!magnet) return res.status(400).send("Missing url param");
   const state = getOrAddTorrent(magnet);
   if (!state || !state.videoFile) {
-    res.status(503).send("Video is not ready yet. Please try again later.");
+    res.status(200).send("NOT_READY");
     return;
   }
   const videoFile = state.videoFile;
@@ -60,7 +60,7 @@ export function streamAssSubtitles(req, res) {
   if (!magnet) return res.status(400).send("Missing url param");
   const state = getOrAddTorrent(magnet);
   if (!state || !state.videoFile) {
-    res.status(503).send("Video is not ready yet. Please try again later.");
+    res.status(200).send("NOT_READY");
     return;
   }
   const videoFile = state.videoFile;
@@ -116,7 +116,7 @@ export function streamVttSubtitles(req, res) {
   if (!magnet) return res.status(400).send("Missing url param");
   const state = getOrAddTorrent(magnet);
   if (!state || !state.videoFile) {
-    res.status(503).send("Video is not ready yet. Please try again later.");
+    res.status(200).send("NOT_READY");
     return;
   }
   const torrent = state.torrent;
