@@ -8,37 +8,82 @@
   </head>
   <body>
     <main class="container">
-      <h1>Paste Magnet URL</h1>
-      <form id="magnet-form" class="magnet-form">
-        <input
-          type="text"
-          id="magnet-url"
-          name="url"
-          placeholder="Paste magnet:?xt=..."
-          class="magnet-form-input"
-          required
-        />
-        <div class="magnet-form-helper">
-          Example:
-          <code>magnet:?xt=urn:btih:QQSOBFAQDJ4A4ROQILCNMHDGP2BT72J5</code>
-        </div>
-        <button type="submit" class="magnet-form-btn">Load Magnet</button>
+      <h1>Load Torrent</h1>
+      <div class="tabs">
+        <button type="button" class="tab-btn active" data-tab="magnet">Magnet URL</button>
+        <button type="button" class="tab-btn" data-tab="torrent">Torrent File</button>
+      </div>
+      
+      <!-- Magnet URL Tab -->
+      <div id="magnet-tab" class="tab-content active">
+        <form id="magnet-form" class="magnet-form">
+          <input
+            type="text"
+            id="magnet-url"
+            name="url"
+            placeholder="Paste magnet:?xt=..."
+            class="magnet-form-input"
+            required
+          />
+          <div class="magnet-form-helper">
+            Example:
+            <code>magnet:?xt=urn:btih:QQSOBFAQDJ4A4ROQILCNMHDGP2BT72J5</code>
+          </div>
+          <button type="submit" class="magnet-form-btn">Load Magnet</button>
+        </form>
+      </div>
 
-        <div
-          id="magnet-error"
-          class="magnet-form-error"
-          style="display: none"
-        ></div>
-      </form>
+      <!-- Torrent File Tab -->
+      <div id="torrent-tab" class="tab-content">
+        <form id="torrent-form" class="magnet-form">
+          <div class="file-upload-area" id="file-upload-area">
+            <input type="file" id="torrent-file" accept=".torrent" style="display: none;" />
+            <div class="file-upload-content">
+              <p>Drop a .torrent file here or click to select</p>
+              <button type="button" class="magnet-form-btn" onclick="document.getElementById('torrent-file').click()">
+                Choose Torrent File
+              </button>
+            </div>
+          </div>
+          <div id="file-info" class="file-info" style="display: none;">
+            <p id="file-name"></p>
+            <button type="submit" class="magnet-form-btn">Parse & Load Torrent</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="magnet-error" class="magnet-form-error" style="display: none"></div>
+      <div id="loading" class="loading" style="display: none;">
+        <p>Parsing torrent file...</p>
+      </div>
+    </main>
     </main>
     <footer class="footer">
       Created with ❤️ by
       <a href="https://github.com/wdallo" target="_blank"> wdallo </a>
     </footer>
+
+    <script src="/libs/torrentPraser.js"></script>
     <script>
-      document
-        .getElementById("magnet-form")
-        .addEventListener("submit", function (e) {
+      let torrentParser;
+
+      // Initialize when page loads
+      document.addEventListener('DOMContentLoaded', function() {
+        torrentParser = new TorrentParser();
+        setupEventListeners();
+      });
+
+      function setupEventListeners() {
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+            switchTab(tabName);
+          });
+        });
+
+        // Magnet form submission
+        document.getElementById("magnet-form").addEventListener("submit", function (e) {
           e.preventDefault();
           const url = document.getElementById("magnet-url").value.trim();
           const errorDiv = document.getElementById("magnet-error");
@@ -46,10 +91,124 @@
             errorDiv.style.display = "none";
             window.location.href = "/player?url=" + encodeURIComponent(url);
           } else {
-            errorDiv.textContent = "Please enter a valid magnet URL.";
-            errorDiv.style.display = "block";
+            showError("Please enter a valid magnet URL.");
           }
         });
+
+        // Torrent form submission
+        document.getElementById("torrent-form").addEventListener("submit", function (e) {
+          e.preventDefault();
+          processTorrentFile();
+        });
+
+        // File input handling
+        const fileInput = document.getElementById('torrent-file');
+        const uploadArea = document.getElementById('file-upload-area');
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+          e.preventDefault();
+          uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+          e.preventDefault();
+          uploadArea.classList.remove('drag-over');
+          const files = e.dataTransfer.files;
+          if (files.length > 0 && files[0].name.endsWith('.torrent')) {
+            fileInput.files = files;
+            handleFileSelect();
+          } else {
+            showError("Please select a valid .torrent file.");
+          }
+        });
+      }
+
+      function switchTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+
+        // Clear errors
+        hideError();
+      }
+
+      function handleFileSelect() {
+        const fileInput = document.getElementById('torrent-file');
+        const fileInfo = document.getElementById('file-info');
+        const fileName = document.getElementById('file-name');
+
+        if (fileInput.files.length > 0) {
+          const file = fileInput.files[0];
+          if (file.name.endsWith('.torrent')) {
+            fileName.textContent = `Selected: ${file.name}`;
+            fileInfo.style.display = 'block';
+            hideError();
+          } else {
+            showError("Please select a valid .torrent file.");
+            fileInfo.style.display = 'none';
+          }
+        } else {
+          fileInfo.style.display = 'none';
+        }
+      }
+
+      async function processTorrentFile() {
+        const fileInput = document.getElementById('torrent-file');
+        const loadingDiv = document.getElementById('loading');
+
+        if (fileInput.files.length === 0) {
+          showError("Please select a torrent file first.");
+          return;
+        }
+
+        const file = fileInput.files[0];
+        loadingDiv.style.display = 'block';
+        hideError();
+
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          const magnetUrl = await torrentParser.parseTorrentFile(uint8Array);
+          
+          loadingDiv.style.display = 'none';
+          
+          // Redirect to player with the generated magnet URL
+          window.location.href = "/player?url=" + encodeURIComponent(magnetUrl);
+          
+        } catch (error) {
+          loadingDiv.style.display = 'none';
+          console.error('Error parsing torrent file:', error);
+          showError(`Failed to parse torrent file: ${error.message}`);
+        }
+      }
+
+      function showError(message) {
+        const errorDiv = document.getElementById("magnet-error");
+        errorDiv.textContent = message;
+        errorDiv.style.display = "block";
+      }
+
+      function hideError() {
+        const errorDiv = document.getElementById("magnet-error");
+        errorDiv.style.display = "none";
+      }
     </script>
   </body>
 </html>

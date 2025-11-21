@@ -72,6 +72,9 @@ export function streamAssSubtitles(req, res) {
     return;
   }
   res.setHeader("Content-Type", "text/x-ssa");
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   let ffmpegCommand = null;
   let hasEnded = false;
   // Helper to send fallback ASS if extraction fails
@@ -184,6 +187,9 @@ export function streamVttSubtitles(req, res) {
   }
   // Extract embedded subtitles from MKV as VTT using ffmpeg
   res.setHeader("Content-Type", "text/vtt");
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   let ffmpegCommand = null;
   let hasEnded = false;
   const sendFallbackVtt = (message = "Subtitle extraction failed") => {

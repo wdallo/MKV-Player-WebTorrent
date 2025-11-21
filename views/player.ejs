@@ -24,6 +24,21 @@
         <div class="progress-container">
           <div class="progress-bar" id="progress-bar"></div>
         </div>
+        <div
+          id="preload-indicator"
+          class="preload-indicator"
+          style="display: none"
+        >
+          <div class="preload-info">
+            <span class="preload-label">Video Buffer:</span>
+            <span id="video-buffer-status" class="preload-value">0%</span>
+            <span class="preload-separator">|</span>
+            <span class="preload-label">Subtitles:</span>
+            <span id="subtitle-preload-status" class="preload-value"
+              >Loading...</span
+            >
+          </div>
+        </div>
         <div id="loading">Loading video and subtitles, please wait...</div>
         <div id="status-msg"></div>
         <div id="error"></div>
@@ -87,6 +102,10 @@
       document.addEventListener("DOMContentLoaded", () => {
         const magnetUrl = "<%= magnet %>";
         const player = new VideoPlayerController(magnetUrl);
+
+        // Make player globally accessible for context menu and debugging
+        window.player = player;
+
         player.initialize();
       });
     </script>

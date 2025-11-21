@@ -20,6 +20,7 @@
 - **Multi-track Support**: Switch between multiple subtitle tracks
 - **ASS/SSA Rendering**: Advanced subtitle formatting with SubtitlesOctopus
 - **Real-time Extraction**: On-demand subtitle extraction from MKV files
+- **Real-time Updates**: Smart subtitle refresh system with cache-busting for live content changes
 - **Custom UI**: Plyr-styled subtitle selector with smooth animations
 - **VTT Fallback**: Support for standard WebVTT subtitles
 
@@ -27,9 +28,11 @@
 
 - **Plyr Integration**: Beautiful, responsive video player
 - **Custom Controls**: CC button, quality indicator, and fullscreen support
+- **Right-click Context Menu**: Real-time status display with video buffer, subtitle progress, and download stats
 - **Resume Functionality**: Continue where you left off or restart from beginning
 - **Loading Overlays**: Smooth transitions with blur effects during subtitle changes
-- **Fullscreen Ready**: All overlays and controls work seamlessly in fullscreen
+- **Fullscreen Ready**: All overlays, controls, and context menu work seamlessly in fullscreen mode
+- **Torrent File Support**: Drag-and-drop .torrent file support with automatic magnet generation
 
 ### 🚀 **Performance & Scalability**
 
@@ -73,7 +76,7 @@ MKV-Player-WebTorrent/
 │
 ├── 📂 libs/                      # Frontend assets & libraries
 │   ├── player.js                # Main player application logic
-│   ├── 📂 styles/               # UI stylesheets
+│   ├── torrentPraser.js         # Prase Torrent file to get magnet
 │   │   ├── style.css            # Custom UI styles
 │   │   └── plyr.css             # Plyr video player styles
 │   ├── 📂 fonts/                # Subtitle font files
@@ -146,7 +149,9 @@ MKV-Player-WebTorrent/
 ### Basic Usage
 
 1. **Home Page**: Navigate to `http://localhost:3000`
-2. **Paste Magnet Link**: Enter any BitTorrent magnet URL
+2. **Add Content**:
+   - **Option A**: Paste any BitTorrent magnet URL
+   - **Option B**: Drag and drop a .torrent file to auto-generate magnet link
 3. **Start Streaming**: Click "Stream Video" to begin playback
 
 ### Direct URL Access
@@ -167,22 +172,37 @@ http://localhost:3000/player?url=magnet%3A%3Fxt%3Durn%3Abtih%3A...
 
 ### Player Controls
 
-| Control               | Function                          |
-| --------------------- | --------------------------------- |
-| **Play/Pause**        | Standard video playback control   |
-| **Progress Bar**      | Seek to any position in the video |
-| **Volume**            | Audio level control               |
-| **CC Button**         | Open subtitle track selector      |
-| **Quality Indicator** | Displays video resolution         |
-| **Settings**          | Plyr player options               |
-| **Fullscreen**        | Expand to full screen mode        |
+| Control               | Function                                   |
+| --------------------- | ------------------------------------------ |
+| **Play/Pause**        | Standard video playback control            |
+| **Progress Bar**      | Seek to any position in the video          |
+| **Volume**            | Audio level control                        |
+| **CC Button**         | Open subtitle track selector               |
+| **Quality Indicator** | Displays video resolution                  |
+| **Settings**          | Plyr player options                        |
+| **Fullscreen**        | Expand to full screen mode                 |
+| **Right-click Menu**  | Context menu with real-time status display |
+
+### Context Menu Features
+
+Right-click anywhere on the video player to access real-time information:
+
+- **Video Buffer**: Current buffered percentage
+- **Subtitle Status**: Active subtitle track and loading state
+- **Subtitle Progress**: Subtitle download progress
+- **Download Progress**: Overall torrent download progress
+- **Close Button (×)**: Click to dismiss the context menu
+
+The context menu works seamlessly in both windowed and fullscreen modes.
 
 ### Subtitle Management
 
 - **Automatic Detection**: Subtitles are extracted automatically from MKV files
 - **Multi-track Support**: Switch between different language tracks
 - **Real-time Loading**: Subtitles load progressively as they become available
+- **Smart Updates**: Intelligent refresh system that only updates changed content
 - **Custom Styling**: Advanced formatting support with ASS/SSA rendering
+- **Progress Monitoring**: Track subtitle download progress via context menu
 
 ### Resume Functionality
 
