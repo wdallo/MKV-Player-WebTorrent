@@ -8,6 +8,7 @@ import videoRoutes from "./routes/videoRoutes.js";
 import statusRoutes from "./routes/statusRoutes.js";
 import subtitleRoutes from "./routes/subtitleRoutes.js";
 import playerRoutes from "./routes/playerRoutes.js";
+import embedRoutes from "./routes/embedRoutes.js";
 
 const app = express();
 app.use(cors());
@@ -28,6 +29,7 @@ app.use(playerRoutes);
 app.use(videoRoutes);
 app.use(statusRoutes);
 app.use(subtitleRoutes);
+app.use("/embed", embedRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -3,6 +3,14 @@
  * Class-based architecture
  */
 
+// Magnet link validation utility
+function isValidMagnet(url) {
+  return (
+    typeof url === "string" &&
+    /^magnet:\?xt=urn:btih:[a-zA-Z0-9]{32,40}/.test(url)
+  );
+}
+
 // Configuration constants for player behavior and timeouts
 // Player configuration constants
 const CONFIG = {
@@ -1470,6 +1478,11 @@ class SubtitlesManager {
  */
 class VideoPlayerController {
   constructor(magnetUrl) {
+    // Validate magnet URL before proceeding
+    if (!isValidMagnet(magnetUrl)) {
+      throw new Error("Invalid or missing magnet URL provided");
+    }
+
     this.magnetUrl = magnetUrl;
     this.playerReadyKey = `playerReady_${magnetUrl}`;
     this.resumeTimeKey = `resumeTime_${magnetUrl}`;
