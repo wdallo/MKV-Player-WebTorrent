@@ -14,6 +14,8 @@
 - **Progressive Loading**: No need to wait for complete downloads
 - **Multi-format Support**: MKV, MP4, and other common video formats
 - **Quality Detection**: Automatic video resolution display (480p, 720p, 1080p, etc.)
+- **Magnet Validation**: Built-in validation to ensure only valid BitTorrent magnet links are processed
+- **Embed Player**: Clean, minimal embed view for external websites with full-screen video display
 
 ### 🎭 **Professional Subtitle System**
 
@@ -67,6 +69,7 @@ MKV-Player-WebTorrent/
 │
 ├── 📂 routes/                    # Express route definitions
 │   ├── playerRoutes.js          # /player endpoint
+│   ├── embedRoutes.js           # /embed endpoint for embeddable player
 │   ├── statusRoutes.js          # /status, /goodbye endpoints
 │   ├── subtitleRoutes.js        # /subtitles, /subtitle-tracks endpoints
 │   └── videoRoutes.js           # /video endpoint
@@ -76,9 +79,11 @@ MKV-Player-WebTorrent/
 │
 ├── 📂 libs/                      # Frontend assets & libraries
 │   ├── player.js                # Main player application logic
-│   ├── torrentPraser.js         # Prase Torrent file to get magnet
-│   │   ├── style.css            # Custom UI styles
-│   │   └── plyr.css             # Plyr video player styles
+│   ├── torrentPraser.js         # Parse Torrent file to get magnet
+│   └── 📂 styles/               # CSS stylesheets
+│       ├── style.css            # Custom UI styles
+│       ├── embed.css            # Embed player styles
+│       └── plyr.css             # Plyr video player styles
 │   ├── 📂 fonts/                # Subtitle font files
 │   │   ├── ARIALBD.TTF          # Subtitle font (Arial Bold)
 │   │   └── NotoSansJP-Bold.ttf  # Japanese subtitle font
@@ -91,6 +96,7 @@ MKV-Player-WebTorrent/
 ├── 📂 views/                     # EJS template files
 │   ├── index.ejs                # Home page template
 │   ├── player.ejs               # Video player interface
+│   ├── embed.ejs                # Embeddable player view
 │   └── sysinfo.ejs              # System monitoring dashboard
 │
 └── 📂 downloads/                 # Temporary torrent file storage
@@ -166,6 +172,26 @@ http://localhost:3000/player?url=<magnet-link>
 
 ```
 http://localhost:3000/player?url=magnet%3A%3Fxt%3Durn%3Abtih%3A...
+```
+
+### Embed Player
+
+Use the embed player for external websites with a clean, full-screen interface:
+
+```
+http://localhost:3000/embed?url=<magnet-link>
+```
+
+**Embed Code:**
+
+```html
+<iframe
+  src="http://localhost:3000/embed?url=magnet%3A%3Fxt%3Durn%3Abtih%3A..."
+  width="640"
+  height="360"
+  frameborder="0"
+  allowfullscreen
+></iframe>
 ```
 
 > **Tip**: Make sure to URL-encode the magnet link for proper parsing
@@ -343,6 +369,11 @@ CONFIG.MAX_RETRY_DELAY = 30000;
 - **Description**: Main player interface
 - **Response**: HTML player page
 
+**GET** `/embed?url=<magnet>`
+
+- **Description**: Embeddable player interface with full-screen video
+- **Response**: HTML embed player page
+
 **GET** `/`
 
 - **Description**: Home page with magnet input
@@ -408,7 +439,7 @@ Access the system monitoring dashboard at `/sysinfo` to view:
 | ------- | --------------------- | ------------------------------- |
 | **503** | Resource not ready    | Wait for more download progress |
 | **404** | Video file not found  | Check magnet link validity      |
-| **416** | Range not satisfiable | Video file may be corrupted     |
+| **416** | Range not satisfiable | Check HTTP range header format  |
 | **429** | Too many requests     | Implement request throttling    |
 | **500** | Server error          | Check server logs and restart   |
 

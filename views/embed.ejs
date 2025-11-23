@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Embedded MKV Video Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="preload" as="style" href="/libs/styles/plyr.css" />
+    <link rel="stylesheet" href="/libs/styles/plyr.css" />
+    <link rel="stylesheet" href="/libs/styles/embed.css" />
+
+    <script src="/libs/octopus/subtitles-octopus.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <!-- Video Player Section -->
+      <section id="video-container" class="video-container-main">
+        <div id="plyr-loading-overlay" class="plyr-loading-overlay">
+          <div style="text-align: center">
+            <div class="plyr-spinner"></div>
+            <div class="plyr-loading-text">Loading video player...</div>
+          </div>
+        </div>
+        <div class="video-container-tag">
+          <video
+            id="player"
+            class="hidden-until-plyr video-player-tag"
+            controls
+            crossorigin
+            playsinline
+            preload="metadata"
+          ></video>
+          <!-- Watermark Overlay -->
+          <div class="video-watermark"></div>
+
+          <!-- Resume/Start Module -->
+          <div
+            id="resume-module"
+            class="resume-module"
+            role="dialog"
+            aria-labelledby="resume-title"
+            aria-modal="true"
+          >
+            <div id="resume-module-inner" class="resume-module-inner">
+              <div id="resume-title" class="playback-title">
+                Resume playback?
+              </div>
+              <button id="resume-btn" class="resume-button">
+                Resume from last position
+              </button>
+              <button id="restart-btn" class="start-from-beginning-button">
+                Start from beginning
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Hidden status elements required by player -->
+    <div class="status-section" style="position: absolute; top: -9999px">
+      <div class="status-details" id="status-details">&nbsp;</div>
+      <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div id="loading">Loading video and subtitles, please wait...</div>
+      <div id="status-msg"></div>
+      <div id="error"></div>
+      <button id="retry-btn" class="retry-button">Retry Video Load</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+    <script src="../libs/player.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const magnetUrl = urlParams.get("url") || "<%= url %>";
+
+        if (!magnetUrl || !isValidMagnet(magnetUrl)) {
+          const loadingText =
+            document.getElementsByClassName("plyr-loading-text")[0];
+          const spinner = document.getElementsByClassName("plyr-spinner")[0];
+          if (spinner) spinner.style.display = "none";
+          if (loadingText) loadingText.textContent = "";
+
+          const errorBox = document.createElement("div");
+          errorBox.style.position = "absolute";
+          errorBox.style.top = "50%";
+          errorBox.style.left = "50%";
+          errorBox.style.transform = "translate(-50%, -50%)";
+          errorBox.style.background = "none";
+          errorBox.style.color = "#fff";
+          errorBox.style.fontFamily = "Segoe UI, Arial, sans-serif";
+          errorBox.style.textAlign = "center";
+          errorBox.style.zIndex = "9999";
+
+          // Icon
+          const icon = document.createElement("div");
+          icon.textContent = "⚠️";
+          icon.style.fontSize = "3em";
+          icon.style.color = "#ffc107";
+          icon.style.marginBottom = "18px";
+
+          // Title
+          const title = document.createElement("div");
+          title.textContent = "Invalid or Missing Magnet URL";
+          title.style.fontSize = "1.35em";
+          title.style.fontWeight = "700";
+          title.style.marginBottom = "10px";
+
+          // Description
+          const desc = document.createElement("div");
+          desc.textContent =
+            "Please supply a valid magnet or video URL in the url parameter to use the embedded player.";
+          desc.style.fontSize = "1em";
+          desc.style.color = "#ddd";
+          desc.style.opacity = "0.9";
+          desc.style.maxWidth = "340px";
+          desc.style.margin = "0 auto";
+
+          errorBox.appendChild(icon);
+          errorBox.appendChild(title);
+          errorBox.appendChild(desc);
+
+          const overlay = document.getElementById("plyr-loading-overlay");
+          if (overlay) {
+            overlay.innerHTML = "";
+            overlay.appendChild(errorBox);
+          }
+
+          return;
+        }
+        const player = new VideoPlayerController(magnetUrl);
+        window.player = player;
+        player.initialize();
+      });
+
+      const statusDetails = document.querySelector(".status-details");
+      console.log(statusDetails);
+    </script>
+  </body>
+</html>
