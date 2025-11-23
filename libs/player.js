@@ -18,6 +18,7 @@ const CONFIG = {
   WATERMARK_CONTENT: "Demo Watermark", // Text to display as watermark on video
   MANUAL_CLEANUP: false, // Enable immediate cleanup when player is closed/navigated away
   AUTO_DELETE_HOURS: 72, // Hours after which unused torrents are automatically deleted
+  DEBUG_MODE: true, // Debug Mode on (true) / off (false)
 };
 
 // Make CONFIG available globally for UI access
@@ -643,7 +644,8 @@ class UIController {
   // Setup context menu for video element
   setupVideoContextMenu() {
     if (!this.elements.video) {
-      console.warn("Video element not found for context menu setup");
+      if (CONFIG.DEBUG_MODE)
+        console.warn("Video element not found for context menu setup");
       return;
     }
 
@@ -850,6 +852,7 @@ class ResourceLoader {
           `Polling for ${isText ? "subtitles" : "video"}... (attempt ${i + 1})`
         );
       }
+
       try {
         // Add timestamp for cache busting if URL doesn't already have one
         const urlToFetch = url.includes("_t=")
@@ -925,13 +928,15 @@ class SubtitlesManager {
         }
         return this.availableTracks;
       } else {
-        console.log(
-          "Failed to fetch subtitle tracks, status:",
-          response.status
-        );
+        if (CONFIG.DEBUG_MODE)
+          console.log(
+            "Failed to fetch subtitle tracks, status:",
+            response.status
+          );
       }
     } catch (error) {
-      console.log("Failed to fetch subtitle tracks:", error);
+      if (CONFIG.DEBUG_MODE)
+        console.log("Failed to fetch subtitle tracks:", error);
     }
     return [];
   }
@@ -1074,7 +1079,8 @@ class SubtitlesManager {
       if (altContainer) {
         altContainer.appendChild(selectorContainer);
       } else {
-        console.log("No suitable container found for subtitle selector");
+        if (CONFIG.DEBUG_MODE)
+          console.log("No suitable container found for subtitle selector");
       }
     }
 
@@ -1258,7 +1264,8 @@ class SubtitlesManager {
       if (video) video.classList.remove("blurred-for-subtitles-loading");
       if (video && video.paused) video.play();
     } catch (error) {
-      console.error("Failed to load subtitle track:", error);
+      if (CONFIG.DEBUG_MODE)
+        console.error("Failed to load subtitle track:", error);
       // Hide overlay and remove blur on error
       if (overlay) overlay.style.display = "none";
       if (video) video.classList.remove("blurred-for-subtitles-loading");
@@ -1324,7 +1331,8 @@ class SubtitlesManager {
           }
         }
       } catch (e) {
-        console.warn("Failed to poll for subtitle updates:", e);
+        if (CONFIG.DEBUG_MODE)
+          console.warn("Failed to poll for subtitle updates:", e);
       }
     }, 3000); // Check every 3 seconds to reduce unnecessary requests
   }
@@ -1398,7 +1406,8 @@ class SubtitlesManager {
         this.octopus.setTrack(newContent);
         return;
       } catch (e) {
-        console.log("Hot reload failed, falling back to full reload:", e);
+        if (CONFIG.DEBUG_MODE)
+          console.log("Hot reload failed, falling back to full reload:", e);
       }
     }
 
@@ -1426,7 +1435,8 @@ class SubtitlesManager {
         }
       }, 100);
     } catch (error) {
-      console.error("Failed to update subtitles:", error);
+      if (CONFIG.DEBUG_MODE)
+        console.error("Failed to update subtitles:", error);
       // Restore canvas visibility on error
       const canvas = document.querySelector(".libassjs-canvas");
       if (canvas) {
@@ -1505,9 +1515,10 @@ class VideoPlayerController {
     window.addEventListener("storage", (e) => {
       // Check if our specific keys were removed by another tab
       if (e.key === this.playerReadyKey && e.newValue === null) {
-        console.log(
-          "Another tab cleaned up this magnet, cleaning up localStorage"
-        );
+        if (CONFIG.DEBUG_MODE)
+          console.log(
+            "Another tab cleaned up this magnet, cleaning up localStorage"
+          );
         this.clearLocalStorageData();
         this.ui.showError(
           "Files were deleted from another tab. Please reload."
@@ -1564,13 +1575,15 @@ class VideoPlayerController {
       window.addEventListener("beforeunload", cleanupAll);
       window.addEventListener("pagehide", cleanupAll);
       window.addEventListener("unload", cleanupAll);
-      console.log(
-        "Manual cleanup enabled - files will be deleted when player is closed"
-      );
+      if (CONFIG.DEBUG_MODE)
+        console.log(
+          "Manual cleanup enabled - files will be deleted when player is closed"
+        );
     } else {
-      console.log(
-        `Manual cleanup disabled - files will auto-delete after ${CONFIG.AUTO_DELETE_HOURS} hours`
-      );
+      if (CONFIG.DEBUG_MODE)
+        console.log(
+          `Manual cleanup disabled - files will auto-delete after ${CONFIG.AUTO_DELETE_HOURS} hours`
+        );
     }
   }
 
@@ -1787,7 +1800,8 @@ class VideoPlayerController {
     if (data) {
       // Check if file was deleted externally
       if (data.fileDeleted) {
-        console.log("File was deleted externally, cleaning up localStorage");
+        if (CONFIG.DEBUG_MODE)
+          console.log("File was deleted externally, cleaning up localStorage");
         this.clearLocalStorageData();
         this.ui.showError(
           "Video file was deleted. Please reload with a new torrent."
@@ -1836,7 +1850,7 @@ class VideoPlayerController {
 
   // Handle video error event and trigger retry logic
   handleVideoError() {
-    console.log("Video error event triggered");
+    if (CONFIG.DEBUG_MODE) console.log("Video error event triggered");
     this.ui.showError("Video loading... (will retry automatically)");
     this.ui.showRetryButton();
     this.ui.showStep("Video error event - starting retry");
@@ -1986,17 +2000,19 @@ class VideoPlayerController {
   // Cleanup resources and notify server when leaving page
   cleanup() {
     if (!CONFIG.MANUAL_CLEANUP) {
-      console.log("Manual cleanup is disabled - skipping immediate cleanup");
+      if (CONFIG.DEBUG_MODE)
+        console.log("Manual cleanup is disabled - skipping immediate cleanup");
       this.statusPoller.stop();
       this.retryController.clearContinuousRetry();
       this.subtitlesManager.cleanup();
       return;
     }
 
-    console.log(
-      "Manual cleanup enabled - sending goodbye beacon for:",
-      this.magnetUrl
-    );
+    if (CONFIG.DEBUG_MODE)
+      console.log(
+        "Manual cleanup enabled - sending goodbye beacon for:",
+        this.magnetUrl
+      );
     this.statusPoller.stop();
     this.retryController.clearContinuousRetry();
     this.subtitlesManager.cleanup();
@@ -2010,7 +2026,7 @@ class VideoPlayerController {
     try {
       // Method 1: sendBeacon with URL parameter (preferred)
       const sent = navigator.sendBeacon(goodbyeUrl);
-      console.log("SendBeacon result:", sent);
+      if (CONFIG.DEBUG_MODE) console.log("SendBeacon result:", sent);
 
       // Method 2: Fallback fetch with URL parameter and handle response
       if (!sent) {
@@ -2027,7 +2043,7 @@ class VideoPlayerController {
           .catch((err) => console.log("Fetch cleanup failed:", err));
       }
     } catch (err) {
-      console.error("Cleanup beacon failed:", err);
+      if (CONFIG.DEBUG_MODE) console.error("Cleanup beacon failed:", err);
       // Method 3: Last resort - synchronous XHR with URL parameter
       try {
         const xhr = new XMLHttpRequest();
@@ -2037,18 +2053,20 @@ class VideoPlayerController {
           try {
             const response = JSON.parse(xhr.responseText);
             if (response.shouldClearLocalStorage && response.magnet) {
-              console.log(
-                "Server requested localStorage cleanup for:",
-                response.magnet
-              );
+              if (CONFIG.DEBUG_MODE)
+                console.log(
+                  "Server requested localStorage cleanup for:",
+                  response.magnet
+                );
               this.clearLocalStorageData();
             }
           } catch (parseErr) {
-            console.log("Could not parse cleanup response");
+            if (CONFIG.DEBUG_MODE)
+              console.log("Could not parse cleanup response");
           }
         }
       } catch (xhrErr) {
-        console.error("XHR cleanup failed:", xhrErr);
+        if (CONFIG.DEBUG_MODE) console.error("XHR cleanup failed:", xhrErr);
       }
     }
 
@@ -2063,32 +2081,37 @@ class VideoPlayerController {
     try {
       const removedKeys = [];
 
-      console.log("=== CLEARING LOCALSTORAGE ===");
-      console.log("Magnet URL:", this.magnetUrl);
-      console.log("Player Ready Key:", this.playerReadyKey);
-      console.log("Resume Time Key:", this.resumeTimeKey);
+      if (CONFIG.DEBUG_MODE) console.log("=== CLEARING LOCALSTORAGE ===");
+      if (CONFIG.DEBUG_MODE) console.log("Magnet URL:", this.magnetUrl);
+      if (CONFIG.DEBUG_MODE)
+        console.log("Player Ready Key:", this.playerReadyKey);
+      if (CONFIG.DEBUG_MODE)
+        console.log("Resume Time Key:", this.resumeTimeKey);
 
       if (localStorage.getItem(this.playerReadyKey)) {
         localStorage.removeItem(this.playerReadyKey);
         removedKeys.push(this.playerReadyKey);
-        console.log("Removed playerReady key:", this.playerReadyKey);
+        if (CONFIG.DEBUG_MODE)
+          console.log("Removed playerReady key:", this.playerReadyKey);
       }
 
       if (localStorage.getItem(this.resumeTimeKey)) {
         localStorage.removeItem(this.resumeTimeKey);
         removedKeys.push(this.resumeTimeKey);
-        console.log("Removed resumeTime key:", this.resumeTimeKey);
+        if (CONFIG.DEBUG_MODE)
+          console.log("Removed resumeTime key:", this.resumeTimeKey);
       }
 
       // Look for keys that contain this exact magnet URL or its hash
       const magnetHash = this.magnetUrl.split("btih:")[1]?.split("&")[0];
       const keysToRemove = [];
 
-      console.log("Scanning localStorage for magnet-related keys...");
+      if (CONFIG.DEBUG_MODE)
+        console.log("Scanning localStorage for magnet-related keys...");
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key) {
-          console.log(`Checking key: ${key}`);
+          if (CONFIG.DEBUG_MODE) console.log(`Checking key: ${key}`);
           if (
             key.includes(this.magnetUrl) ||
             (magnetHash && key.includes(magnetHash)) ||
@@ -2096,7 +2119,8 @@ class VideoPlayerController {
             key === this.resumeTimeKey
           ) {
             keysToRemove.push(key);
-            console.log(`Key marked for removal: ${key}`);
+            if (CONFIG.DEBUG_MODE)
+              console.log(`Key marked for removal: ${key}`);
           }
         }
       }
@@ -2105,15 +2129,17 @@ class VideoPlayerController {
         if (localStorage.getItem(key)) {
           localStorage.removeItem(key);
           removedKeys.push(key);
-          console.log(`Removed key: ${key}`);
+          if (CONFIG.DEBUG_MODE) console.log(`Removed key: ${key}`);
         }
       });
 
-      console.log(`Total removed keys: ${removedKeys.length}`);
-      console.log("Removed keys:", removedKeys);
-      console.log("=== CLEANUP COMPLETE ===");
+      if (CONFIG.DEBUG_MODE)
+        console.log(`Total removed keys: ${removedKeys.length}`);
+      if (CONFIG.DEBUG_MODE) console.log("Removed keys:", removedKeys);
+      if (CONFIG.DEBUG_MODE) console.log("=== CLEANUP COMPLETE ===");
     } catch (err) {
-      console.error("Failed to clear localStorage:", err);
+      if (CONFIG.DEBUG_MODE)
+        console.error("Failed to clear localStorage:", err);
     }
   }
 }
@@ -2238,54 +2264,57 @@ class FullscreenController {
  */
 window.cleanLocalStorageForMagnet = function (magnetUrl) {
   if (!magnetUrl) {
-    console.error("Please provide a magnet URL");
+    if (CONFIG.DEBUG_MODE) console.error("Please provide a magnet URL");
     return;
   }
 
   try {
-    console.log("=== GLOBAL CLEANUP FUNCTION ===");
-    console.log("Target magnet:", magnetUrl);
+    if (CONFIG.DEBUG_MODE) console.log("=== GLOBAL CLEANUP FUNCTION ===");
+    if (CONFIG.DEBUG_MODE) console.log("Target magnet:", magnetUrl);
 
     const removedKeys = [];
     const magnetHash = magnetUrl.split("btih:")[1]?.split("&")[0];
     const keysToRemove = [];
 
-    console.log("Extracted hash:", magnetHash);
-    console.log("Current localStorage size:", localStorage.length);
+    if (CONFIG.DEBUG_MODE) console.log("Extracted hash:", magnetHash);
+    if (CONFIG.DEBUG_MODE)
+      console.log("Current localStorage size:", localStorage.length);
 
     // Find all keys related to this magnet
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key) {
-        console.log(`Checking key: ${key}`);
+        if (CONFIG.DEBUG_MODE) console.log(`Checking key: ${key}`);
         if (
           key.includes(magnetUrl) ||
           (magnetHash && key.includes(magnetHash))
         ) {
           keysToRemove.push(key);
-          console.log(`Key marked for removal: ${key}`);
+          if (CONFIG.DEBUG_MODE) console.log(`Key marked for removal: ${key}`);
         }
       }
     }
 
-    console.log(`Found ${keysToRemove.length} keys to remove`);
+    if (CONFIG.DEBUG_MODE)
+      console.log(`Found ${keysToRemove.length} keys to remove`);
 
     // Remove all found keys
     keysToRemove.forEach((key) => {
       localStorage.removeItem(key);
       removedKeys.push(key);
-      console.log(`Removed key: ${key}`);
+      if (CONFIG.DEBUG_MODE) console.log(`Removed key: ${key}`);
     });
 
-    console.log(
-      `Cleaned ${removedKeys.length} localStorage keys for magnet:`,
-      magnetUrl
-    );
-    console.log("Removed keys:", removedKeys);
-    console.log("=== GLOBAL CLEANUP COMPLETE ===");
+    if (CONFIG.DEBUG_MODE)
+      console.log(
+        `Cleaned ${removedKeys.length} localStorage keys for magnet:`,
+        magnetUrl
+      );
+    if (CONFIG.DEBUG_MODE) console.log("Removed keys:", removedKeys);
+    if (CONFIG.DEBUG_MODE) console.log("=== GLOBAL CLEANUP COMPLETE ===");
     return { success: true, removedKeys };
   } catch (err) {
-    console.error("Failed to clean localStorage:", err);
+    if (CONFIG.DEBUG_MODE) console.error("Failed to clean localStorage:", err);
     return { success: false, error: err.message };
   }
 };
@@ -2296,11 +2325,12 @@ window.cleanLocalStorageForMagnet = function (magnetUrl) {
  */
 window.notifyMagnetDeleted = function (magnetUrl) {
   if (!magnetUrl) {
-    console.error("Please provide a magnet URL");
+    if (CONFIG.DEBUG_MODE) console.error("Please provide a magnet URL");
     return;
   }
 
-  console.log("Received notification that magnet was deleted:", magnetUrl);
+  if (CONFIG.DEBUG_MODE)
+    console.log("Received notification that magnet was deleted:", magnetUrl);
 
   // Clean localStorage for this magnet
   const result = window.cleanLocalStorageForMagnet(magnetUrl);
