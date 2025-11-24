@@ -94,12 +94,16 @@ MKV-Player-WebTorrent/
 ├── 📁 favicon.ico                # Application icon
 ├── 📁 .npmrc, .gitignore         # Configuration files
 │
-├── 📂 controllers/               # Business logic controllers
+├── 📂 controllers/              # Business logic controllers
+│   ├── audioController.js       # Audio track management API
 │   ├── playerController.js      # Player page rendering & config
 │   ├── statusController.js      # Torrent status & progress API
+│   ├── subtitleController.js    # Subtitle management API
 │   └── videoController.js       # Video streaming & file serving
 │
+│
 ├── 📂 routes/                    # Express route definitions
+│   ├── audioRouter.js           # /audio-tracks endpoint
 │   ├── playerRoutes.js          # /player endpoint
 │   ├── embedRoutes.js           # /embed endpoint for embeddable player
 │   ├── statusRoutes.js          # /status, /goodbye endpoints
