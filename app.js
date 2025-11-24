@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import videoRoutes from "./routes/videoRoutes.js";
+import audioRoutes from "./routes/audioRoutes.js";
 import statusRoutes from "./routes/statusRoutes.js";
 import subtitleRoutes from "./routes/subtitleRoutes.js";
 import playerRoutes from "./routes/playerRoutes.js";
@@ -27,9 +28,10 @@ app.set("views", path.join(__dirname, "views"));
 // Mount routes
 app.use(playerRoutes);
 app.use(videoRoutes);
+app.use(audioRoutes);
 app.use(statusRoutes);
 app.use(subtitleRoutes);
-app.use("/embed", embedRoutes);
+app.use(embedRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

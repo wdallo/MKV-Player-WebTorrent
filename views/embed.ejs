@@ -124,7 +124,7 @@
 
           const overlay = document.getElementById("plyr-loading-overlay");
           if (overlay) {
-            overlay.innerHTML = "";
+            overlay.textContent = ""; // Clear any existing content
             overlay.appendChild(errorBox);
           }
 
