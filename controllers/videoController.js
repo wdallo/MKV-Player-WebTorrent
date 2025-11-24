@@ -6,12 +6,20 @@ import {
 } from "../services/torrentService.js";
 import { rm } from "fs/promises";
 
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegPath from "ffmpeg-static";
+
+// Set FFmpeg path
+ffmpeg.setFfmpegPath(ffmpegPath);
+
 const MIN_READY_BYTES = 256 * 1024; // 256KB for ultra-fast start
 const PRIORITY_PIECES = 20; // Download first 20 pieces with priority
 
 // Streams video content for a given magnet link, supporting HTTP range requests
 export function streamVideo(req, res) {
   const magnet = req.query.url;
+  const audioTrack = req.query.audioTrack;
+  const startTime = req.query.t;
 
   if (!magnet) {
     console.warn("[VIDEO] Missing url param");
@@ -24,11 +32,28 @@ export function streamVideo(req, res) {
   const state = getOrAddTorrent(magnet);
   if (!state || !state.videoFile) {
     console.warn(`[VIDEO] Video not ready for magnet: ${magnet}`);
+    console.warn(`[VIDEO] State exists: ${!!state}`);
+    if (state) {
+      console.warn(`[VIDEO] VideoFile exists: ${!!state.videoFile}`);
+      console.warn(
+        `[VIDEO] Torrent status: ${
+          state.torrent ? state.torrent.progress : "no torrent"
+        }`
+      );
+    }
     res.status(200).send("NOT_READY");
     return;
   }
   const videoFile = state.videoFile;
   const videoMime = state.videoMime;
+
+  // Check if audio track transcoding is requested
+  if (audioTrack !== undefined && audioTrack !== "0") {
+    console.log(
+      `[VIDEO] Audio track ${audioTrack} requested, using transcoding`
+    );
+    return handleAudioTrackTranscoding(req, res, magnet, audioTrack, startTime);
+  }
 
   // Set priority for first pieces (contains MKV metadata)
   if (videoFile._torrent) {
@@ -228,4 +253,101 @@ export function cleanLocalStorage(req, res) {
     magnet: magnet,
     message: "LocalStorage cleanup requested",
   });
+}
+
+// Handle audio track transcoding using FFmpeg
+function handleAudioTrackTranscoding(req, res, magnet, audioTrack, startTime) {
+  const state = getOrAddTorrent(magnet);
+  if (!state || !state.videoFile) {
+    return res.status(200).send("NOT_READY");
+  }
+
+  const videoFile = state.videoFile;
+
+  // Check if enough data is downloaded for remuxing (much less needed for lossless)
+  const MIN_TRANSCODE_BYTES = 1 * 1024 * 1024; // 1MB for lossless remuxing (was 5MB)
+  if (videoFile.downloaded < MIN_TRANSCODE_BYTES) {
+    console.log(
+      `[TRANSCODE] Not enough data for remuxing: ${videoFile.downloaded} < ${MIN_TRANSCODE_BYTES}`
+    );
+    return res.status(200).send("NOT_READY");
+  }
+
+  try {
+    // Set appropriate headers for MKV streaming
+    res.setHeader("Content-Type", "video/x-matroska");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("Accept-Ranges", "bytes");
+
+    // Create a readable stream from the torrent file for ffmpeg
+    const inputStream = videoFile.createReadStream();
+
+    console.log(
+      `[TRANSCODE] Starting LOSSLESS remux with audio track ${audioTrack}`
+    );
+
+    // Create ffmpeg command for LOSSLESS remuxing with specific audio track
+    const command = ffmpeg()
+      .input(inputStream)
+      .videoCodec("copy") // LOSSLESS - Copy video stream without re-encoding
+      .audioCodec("copy") // LOSSLESS - Copy audio stream without re-encoding
+      .format("matroska") // Keep original MKV format for best compatibility
+      .outputOptions([
+        `-map`,
+        `0:v:0`, // First video stream
+        `-map`,
+        `0:a:${audioTrack}`, // Selected audio track
+        "-avoid_negative_ts",
+        "make_zero", // Fix timing issues
+        "-copyts", // Copy timestamps exactly
+        "-start_at_zero", // Start at zero
+        "-threads",
+        "1", // Minimal CPU usage for copy operations
+        "-f",
+        "matroska", // Force MKV output
+      ]);
+
+    // Add start time if specified
+    if (startTime && parseFloat(startTime) > 0) {
+      command.seekInput(parseFloat(startTime));
+    }
+
+    // Handle errors - simple error response instead of recursive fallback
+    command.on("error", (err) => {
+      console.error("[TRANSCODE] Audio transcoding error:", err);
+      console.log("[TRANSCODE] Failed to switch audio track");
+      if (!res.headersSent) {
+        res.status(500).send("Audio track switching failed");
+      }
+    });
+
+    command.on("start", (commandLine) => {
+      console.log(`[TRANSCODE] Started: ${commandLine}`);
+    });
+
+    command.on("progress", (progress) => {
+      if (progress.percent) {
+        console.log(
+          `[TRANSCODE] Processing: ${Math.round(progress.percent)}% done`
+        );
+      }
+    });
+
+    // Ensure response is closed and finalized when FFmpeg finishes
+    command.on("end", () => {
+      console.log("[TRANSCODE] FFmpeg remuxing finished, closing response");
+      if (!res.headersSent) {
+        res.end();
+      }
+    });
+
+    // Start streaming
+    command.pipe(res, { end: true });
+  } catch (error) {
+    console.error("Error setting up audio track transcoding:", error);
+    if (!res.headersSent) {
+      res.status(500).send("Failed to setup audio transcoding");
+    }
+  }
 }

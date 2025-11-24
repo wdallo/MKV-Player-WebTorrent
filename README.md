@@ -16,6 +16,15 @@
 - **Quality Detection**: Automatic video resolution display (480p, 720p, 1080p, etc.)
 - **Magnet Validation**: Built-in validation to ensure only valid BitTorrent magnet links are processed
 - **Embed Player**: Clean, minimal embed view for external websites with full-screen video display
+- **Performance Optimized**: Debounced updates, passive event listeners, and intelligent caching
+
+### 🎵 **Multi-Track Audio Support**
+
+- **Audio Track Selection**: Switch between multiple audio tracks seamlessly
+- **Real-time Switching**: Change audio tracks without interrupting playback
+- **Language Detection**: Automatic audio track language identification
+- **Custom UI**: Plyr-styled audio selector with microphone icon
+- **Seamless Integration**: Works in both windowed and fullscreen modes
 
 ### 🎭 **Professional Subtitle System**
 
@@ -25,6 +34,7 @@
 - **Real-time Updates**: Smart subtitle refresh system with cache-busting for live content changes
 - **Custom UI**: Plyr-styled subtitle selector with smooth animations
 - **VTT Fallback**: Support for standard WebVTT subtitles
+- **Performance Optimized**: Intelligent caching and debounced updates
 
 ### 🎮 **Modern Player Interface**
 
@@ -39,9 +49,13 @@
 ### 🚀 **Performance & Scalability**
 
 - **Multi-user Support**: Each user can stream different torrents simultaneously
-- **WebTorrent Powered**: Efficient P2P streaming technology
-- **Resource Management**: Intelligent cleanup and memory optimization
+- **WebTorrent Powered**: Efficient P2P streaming technology with optimized piece selection
+- **Resource Management**: Intelligent cleanup, memory optimization, and LRU caching
 - **Cross-tab Sync**: Synchronized state across multiple browser tabs
+- **Smart Piece Selection**: Seek-aware piece prioritization for smooth playback
+- **Debounced Operations**: Reduced DOM manipulation and improved responsiveness
+- **Memory Optimization**: Automatic cleanup of inactive torrents and cache management
+- **Connection Optimization**: Reduced connection limits and intelligent peer management
 
 ### 🛠 **Developer Experience**
 
@@ -49,6 +63,24 @@
 - **Comprehensive Logging**: Detailed debug information and error tracking
 - **Configurable Settings**: Extensive configuration options via `CONFIG` object
 - **API Endpoints**: RESTful API for status, subtitles, and video streaming
+
+## 🚀 Recent Improvements
+
+### Performance Optimizations (v2.0)
+
+- **Faster Startup**: Reduced retry delays and optimized resource timeouts
+- **Improved UI Responsiveness**: Debounced status updates and passive event listeners
+- **Memory Management**: Smart DOM caching and automatic cleanup of inactive resources
+- **Better Streaming**: Optimized piece selection and seek-aware torrent management
+- **Resource Monitoring**: Enhanced tracking of memory usage and active torrents
+
+### New Features (v2.0)
+
+- **Multi-Track Audio Support**: Seamless switching between audio languages
+- **Enhanced Subtitle System**: Improved rendering performance and track management
+- **Better Error Handling**: More robust error recovery and user feedback
+- **Cache Optimization**: LRU caching for frequently accessed torrents
+- **Connection Management**: Intelligent peer limit adjustment for better performance
 
 ## 🏗 Architecture Overview
 
@@ -203,6 +235,7 @@ http://localhost:3000/embed?url=<magnet-link>
 | **Play/Pause**        | Standard video playback control            |
 | **Progress Bar**      | Seek to any position in the video          |
 | **Volume**            | Audio level control                        |
+| **Audio Button**      | Switch between multiple audio tracks       |
 | **CC Button**         | Open subtitle track selector               |
 | **Quality Indicator** | Displays video resolution                  |
 | **Settings**          | Plyr player options                        |
@@ -244,18 +277,21 @@ The application uses a comprehensive configuration system located in `libs/playe
 
 ```javascript
 const CONFIG = {
-  MAX_RETRIES: 20, // Max retry attempts before continuous retry
-  BASE_RETRY_DELAY: 2000, // Initial retry delay (ms)
-  MAX_RETRY_DELAY: 10000, // Maximum retry delay (ms)
-  CONTINUOUS_RETRY_INTERVAL: 30000, // Continuous retry interval (ms)
-  STATUS_POLL_INTERVAL: 1000, // Status polling frequency (ms)
+  MAX_RETRIES: 15, // Reduced for faster failure handling
+  BASE_RETRY_DELAY: 1500, // Faster initial retry (ms)
+  MAX_RETRY_DELAY: 8000, // Reduced max retry delay (ms)
+  CONTINUOUS_RETRY_INTERVAL: 25000, // Faster continuous retry (ms)
+  STATUS_POLL_INTERVAL: 800, // Faster status updates for responsiveness (ms)
   READY_THRESHOLD: 256 * 1024, // Bytes needed before playback (256KB)
-  RESOURCE_TIMEOUT: 300, // Resource loading timeout (polling attempts)
-  STALL_TIMEOUT: 20000, // Torrent stall detection (ms)
+  RESOURCE_TIMEOUT: 250, // Reduced timeout for faster failure detection
+  STALL_TIMEOUT: 15000, // Faster stall detection (ms)
   WATERMARK: false, // Show/hide watermark overlay
   WATERMARK_CONTENT: "Demo", // Watermark text content
   MANUAL_CLEANUP: false, // Enable immediate cleanup on page close
   AUTO_DELETE_HOURS: 72, // Auto-delete unused torrents (hours)
+  // Performance optimizations
+  DEBOUNCE_DELAY: 100, // For debounced operations (ms)
+  DOM_CACHE_TIMEOUT: 5000, // Cache DOM queries (ms)
 };
 ```
 
@@ -305,12 +341,29 @@ CONFIG.MAX_RETRY_DELAY = 30000;
 
 ### Video Streaming
 
-**GET** `/video?url=<magnet>`
+**GET** `/video?url=<magnet>&audioTrack=<n>`
 
-- **Description**: Stream video content from torrent
+- **Description**: Stream video content from torrent with specific audio track
 - **Parameters**:
   - `url` (required): URL-encoded magnet link
+  - `audioTrack` (optional): Audio track index for multi-track videos
 - **Response**: Video stream (HTTP 206 for range requests)
+
+### Audio Track Management
+
+**GET** `/audio-tracks?url=<magnet>`
+
+- **Description**: List available audio tracks
+- **Parameters**:
+  - `url` (required): URL-encoded magnet link
+- **Response**: JSON array of audio track information
+
+```json
+[
+  { "language": "eng", "title": "English" },
+  { "language": "jpn", "title": "Japanese" }
+]
+```
 
 ### Subtitle Management
 
@@ -413,15 +466,27 @@ Access the system monitoring dashboard at `/sysinfo` to view:
 - Verify font files are accessible (`ARIALBD.TTF`, `NotoSansJP-Bold.ttf`)
 - Try switching subtitle tracks using CC button
 
+#### Audio Tracks Not Available
+
+**Symptoms**: No audio track selector appears, microphone icon not visible
+**Solutions**:
+
+- Ensure video file contains multiple audio tracks
+- Check browser console for audio track detection errors
+- Verify FFmpeg can analyze the video file properly
+- Try refreshing the page to re-initialize audio detection
+
 #### Performance Issues
 
-**Symptoms**: Choppy playback, high CPU usage, memory leaks
+**Symptoms**: Choppy playbook, high CPU usage, memory leaks, slow UI responses
 **Solutions**:
 
 - Lower `CONFIG.READY_THRESHOLD` for faster startup
-- Reduce WebTorrent connections in environment config
+- Increase `CONFIG.DEBOUNCE_DELAY` to reduce update frequency
 - Enable `CONFIG.MANUAL_CLEANUP` for better resource management
 - Close unused browser tabs and restart the server
+- Check torrent health and try torrents with more seeders
+- Clear browser cache and localStorage to reset state
 
 #### Subtitle Rendering Errors
 
@@ -515,12 +580,12 @@ This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
-- **WebTorrent** - P2P streaming technology
-- **Plyr** - Modern video player interface
-- **SubtitlesOctopus** - Advanced subtitle rendering
-- **FFmpeg** - Video processing and subtitle extraction
-- **Express.js** - Web application framework
-- **The open-source community** - For continuous inspiration and support
+- **WebTorrent** - P2P streaming technology with optimized piece selection
+- **Plyr** - Modern video player interface with custom control integration
+- **SubtitlesOctopus** - Advanced subtitle rendering with performance optimizations
+- **FFmpeg** - Video processing, subtitle extraction, and audio track analysis
+- **Express.js** - Web application framework with efficient routing
+- **The open-source community** - For continuous inspiration, performance insights, and support
 
 ---
 
