@@ -4,18 +4,7 @@ import WebTorrent from "webtorrent";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-
-// Performance configuration
-const PERF_CONFIG = {
-  MAX_CONCURRENT_TORRENTS: 10,
-  PIECE_SELECTION_BATCH_SIZE: 20, // Reduced from 50 for better performance
-  PIECE_SELECTION_INTERVAL: 5,
-  INITIAL_DOWNLOAD_SIZE: 8 * 1024 * 1024, // 8MB for faster startup
-  STREAMING_DOWNLOAD_SIZE: 5 * 1024 * 1024, // 5MB for streaming
-  RESOURCE_LOG_INTERVAL: 5 * 60 * 1000, // 5 minutes
-  CLEANUP_INTERVAL: 30 * 60 * 1000, // 30 minutes
-  FILE_WATCH_DEBOUNCE: 1000, // 1 second debounce for file events
-};
+import { PERF_CONFIG } from "../config/all.config.js";
 
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);

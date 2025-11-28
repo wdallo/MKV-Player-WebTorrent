@@ -3,37 +3,15 @@
  * Class-based architecture
  */
 
-// Magnet link validation utility
-function isValidMagnet(url) {
-  return (
-    typeof url === "string" &&
-    /^magnet:\?xt=urn:btih:[a-zA-Z0-9]{32,40}/.test(url)
-  );
-}
+// Magnet URL validation utility
+import { isValidMagnet } from "../utils/magnetValidator.js";
 
 // Configuration constants for player behavior and timeouts
 // Player configuration constants
-const CONFIG = {
-  MAX_RETRIES: 15, // Reduced for faster failure handling
-  BASE_RETRY_DELAY: 1500, // Faster initial retry
-  MAX_RETRY_DELAY: 8000, // Reduced max delay
-  CONTINUOUS_RETRY_INTERVAL: 25000, // Slightly faster continuous polling
-  STATUS_POLL_INTERVAL: 800, // Faster status updates for responsiveness
-  READY_THRESHOLD: 256 * 1024, // Bytes downloaded before marking player as ready (256KB)
-  RESOURCE_TIMEOUT: 250, // Reduced timeout for faster failure detection
-  STALL_TIMEOUT: 15000, // Faster stall detection
-  WATERMARK: false, // Show watermark on player if true
-  WATERMARK_CONTENT: "Demo Watermark", // Text to display as watermark on video
-  MANUAL_CLEANUP: false, // Enable immediate cleanup when player is closed/navigated away
-  AUTO_DELETE_HOURS: 72, // Hours after which unused torrents are automatically deleted
-  DEBUG_MODE: true, // Debug Mode on (true) / off (false)
-  // Performance optimizations
-  DEBOUNCE_DELAY: 100, // For debounced operations
-  DOM_CACHE_TIMEOUT: 5000, // Cache DOM queries for 5 seconds
-};
+import { PLAYER_CONFIG } from "../config/all.config";
 
-// Make CONFIG available globally for UI access
-window.CONFIG = CONFIG;
+// Make PLAYER_CONFIG available globally for UI access
+window.CONFIG = PLAYER_CONFIG;
 
 // Type definitions (for better code documentation)
 /**
