@@ -14,7 +14,7 @@
 - **Progressive Loading**: No need to wait for complete downloads
 - **Multi-format Support**: MKV, MP4, and other common video formats
 - **Quality Detection**: Automatic video resolution display (480p, 720p, 1080p, etc.)
-- **Magnet Validation**: Built-in validation to ensure only valid BitTorrent magnet links are processed
+- **Magnet Validation**: Built-in validation utility (`utils/magnetValidator.js`) to ensure only valid BitTorrent magnet links are processed
 - **Embed Player**: Clean, minimal embed view for external websites with full-screen video display
 - **Performance Optimized**: Debounced updates, passive event listeners, and intelligent caching
 
@@ -61,26 +61,39 @@
 
 - **Live System Monitoring**: Real-time Node.js resource stats at `/sysinfo`
 - **Comprehensive Logging**: Detailed debug information and error tracking
-- **Configurable Settings**: Extensive configuration options via `CONFIG` object
+- **Centralized Configuration**: Modular config system in `configs/all.config.js`
+- **Utility Functions**: Reusable utilities in `utils/` folder (magnet validation, etc.)
 - **API Endpoints**: RESTful API for status, subtitles, and video streaming
+- **Modular Architecture**: Clean separation of concerns with dedicated folders
 
 ## 🚀 Recent Improvements
 
-### Performance Optimizations (v2.0)
+### Architecture Improvements (v3.0)
+
+- **Centralized Configuration**: All settings moved to `configs/all.config.js` with named exports
+- **Utility Functions**: New `utils/` folder with reusable components like magnet validation
+- **Modular Design**: Better separation of concerns with dedicated folders for configs and utilities
+- **ES6 Modules**: Full migration to modern JavaScript import/export syntax
+- **Code Organization**: Improved project structure for better maintainability
+
+### Performance Optimizations (v2.0-3.0)
 
 - **Faster Startup**: Reduced retry delays and optimized resource timeouts
 - **Improved UI Responsiveness**: Debounced status updates and passive event listeners
 - **Memory Management**: Smart DOM caching and automatic cleanup of inactive resources
 - **Better Streaming**: Optimized piece selection and seek-aware torrent management
 - **Resource Monitoring**: Enhanced tracking of memory usage and active torrents
+- **Batch Processing**: Optimized piece selection with configurable batch sizes
 
-### New Features (v2.0)
+### New Features (v2.0-3.0)
 
 - **Multi-Track Audio Support**: Seamless switching between audio languages
 - **Enhanced Subtitle System**: Improved rendering performance and track management
 - **Better Error Handling**: More robust error recovery and user feedback
 - **Cache Optimization**: LRU caching for frequently accessed torrents
 - **Connection Management**: Intelligent peer limit adjustment for better performance
+- **Magnet Link Validation**: Dedicated utility for validating BitTorrent magnet links
+- **Debug Mode**: Comprehensive logging system for development and troubleshooting
 
 ## 🏗 Architecture Overview
 
@@ -94,6 +107,9 @@ MKV-Player-WebTorrent/
 ├── 📁 favicon.ico                # Application icon
 ├── 📁 .npmrc, .gitignore         # Configuration files
 │
+├── 📂 configs/                  # Centralized configuration
+│   └── all.config.js            # PERF_CONFIG and PLAYER_CONFIG exports
+│
 ├── 📂 controllers/              # Business logic controllers
 │   ├── audioController.js       # Audio track management API
 │   ├── playerController.js      # Player page rendering & config
@@ -101,9 +117,8 @@ MKV-Player-WebTorrent/
 │   ├── subtitleController.js    # Subtitle management API
 │   └── videoController.js       # Video streaming & file serving
 │
-│
 ├── 📂 routes/                    # Express route definitions
-│   ├── audioRouter.js           # /audio-tracks endpoint
+│   ├── audioRoutes.js           # /audio-tracks endpoint
 │   ├── playerRoutes.js          # /player endpoint
 │   ├── embedRoutes.js           # /embed endpoint for embeddable player
 │   ├── statusRoutes.js          # /status, /goodbye endpoints
@@ -112,6 +127,9 @@ MKV-Player-WebTorrent/
 │
 ├── 📂 services/                  # Core business services
 │   └── torrentService.js        # WebTorrent management & lifecycle
+│
+├── 📂 utils/                     # Utility functions & helpers
+│   └── magnetValidator.js       # Magnet link validation utility
 │
 ├── 📂 libs/                      # Frontend assets & libraries
 │   ├── player.js                # Main player application logic
@@ -275,29 +293,67 @@ The context menu works seamlessly in both windowed and fullscreen modes.
 
 ## ⚙️ Configuration
 
-The application uses a comprehensive configuration system located in `libs/player.js`:
+All configuration objects are centralized in `configs/all.config.js` with named exports for easy management and importing.
 
 ### Core Settings
 
+#### Performance Configuration (PERF_CONFIG)
+
+Handles torrent management, streaming optimization, and system performance:
+
 ```javascript
-const CONFIG = {
-  MAX_RETRIES: 15, // Reduced for faster failure handling
-  BASE_RETRY_DELAY: 1500, // Faster initial retry (ms)
-  MAX_RETRY_DELAY: 8000, // Reduced max retry delay (ms)
-  CONTINUOUS_RETRY_INTERVAL: 25000, // Faster continuous retry (ms)
-  STATUS_POLL_INTERVAL: 800, // Faster status updates for responsiveness (ms)
-  READY_THRESHOLD: 256 * 1024, // Bytes needed before playback (256KB)
-  RESOURCE_TIMEOUT: 250, // Reduced timeout for faster failure detection
-  STALL_TIMEOUT: 15000, // Faster stall detection (ms)
-  WATERMARK: false, // Show/hide watermark overlay
-  WATERMARK_CONTENT: "Demo", // Watermark text content
-  MANUAL_CLEANUP: false, // Enable immediate cleanup on page close
-  AUTO_DELETE_HOURS: 72, // Auto-delete unused torrents (hours)
-  // Performance optimizations
-  DEBOUNCE_DELAY: 100, // For debounced operations (ms)
-  DOM_CACHE_TIMEOUT: 5000, // Cache DOM queries (ms)
+export const PERF_CONFIG = {
+  MAX_CONCURRENT_TORRENTS: 10, // Maximum simultaneous torrents
+  PIECE_SELECTION_BATCH_SIZE: 20, // Optimized batch size for better performance
+  PIECE_SELECTION_INTERVAL: 5, // Milliseconds between piece selections
+  INITIAL_DOWNLOAD_SIZE: 8 * 1024 * 1024, // 8MB for faster startup
+  STREAMING_DOWNLOAD_SIZE: 5 * 1024 * 1024, // 5MB for streaming
+  RESOURCE_LOG_INTERVAL: 5 * 60 * 1000, // 5 minutes between resource logs
+  CLEANUP_INTERVAL: 30 * 60 * 1000, // 30 minutes cleanup interval
+  FILE_WATCH_DEBOUNCE: 1000, // 1 second debounce for file events
 };
 ```
+
+#### Player Configuration (PLAYER_CONFIG)
+
+Controls video player behavior, retry logic, and user interface settings:
+
+```javascript
+export const PLAYER_CONFIG = {
+  MAX_RETRIES: 15, // Retry attempts for failed operations
+  BASE_RETRY_DELAY: 1500, // Initial retry delay (ms)
+  MAX_RETRY_DELAY: 8000, // Maximum retry delay (ms)
+  CONTINUOUS_RETRY_INTERVAL: 25000, // Continuous polling interval
+  STATUS_POLL_INTERVAL: 800, // Status update frequency
+  READY_THRESHOLD: 256 * 1024, // 256KB threshold for playback start
+  RESOURCE_TIMEOUT: 250, // Resource loading timeout
+  STALL_TIMEOUT: 15000, // Stall detection timeout
+  WATERMARK: false, // Show/hide watermark overlay
+  WATERMARK_CONTENT: "Demo Watermark", // Watermark text content
+  MANUAL_CLEANUP: false, // Immediate cleanup on page close
+  AUTO_DELETE_HOURS: 72, // Auto-delete unused torrents (hours)
+  DEBUG_MODE: true, // Enable/disable debug logging
+};
+```
+
+### Usage
+
+Import configurations in your modules:
+
+```javascript
+import { PERF_CONFIG, PLAYER_CONFIG } from "../configs/all.config.js";
+
+// Use in your code
+const maxRetries = PLAYER_CONFIG.MAX_RETRIES;
+const batchSize = PERF_CONFIG.PIECE_SELECTION_BATCH_SIZE;
+```
+
+### Benefits
+
+- **Centralized Management**: All settings in one location
+- **Named Exports**: Easy to import specific configs
+- **Type Safety**: Clear configuration structure
+- **Easy Customization**: Modify settings without touching core logic
 
 ### Environment Variables
 
@@ -315,30 +371,41 @@ DEBUG=true                   # Enable debug logging
 #### Watermark Configuration
 
 ```javascript
-// Enable watermark
-CONFIG.WATERMARK = true;
-CONFIG.WATERMARK_CONTENT = "Your Brand Name";
+// In configs/all.config.js
+export const PLAYER_CONFIG = {
+  WATERMARK: true, // Enable watermark
+  WATERMARK_CONTENT: "Your Brand Name", // Custom watermark text
+  // ...other settings
+};
 ```
 
 #### Cleanup Behavior
 
 ```javascript
-// Enable manual cleanup (files deleted when tab closes)
-CONFIG.MANUAL_CLEANUP = true;
-
-// Or use automatic cleanup (files deleted after X hours)
-CONFIG.AUTO_DELETE_HOURS = 24;
+// In configs/all.config.js
+export const PLAYER_CONFIG = {
+  MANUAL_CLEANUP: true, // Enable immediate cleanup on page close
+  AUTO_DELETE_HOURS: 24, // Auto-delete after 24 hours
+  // ...other settings
+};
 ```
 
 #### Performance Tuning
 
 ```javascript
-// Faster startup (lower quality threshold)
-CONFIG.READY_THRESHOLD = 128 * 1024; // 128KB
+// In configs/all.config.js
+export const PLAYER_CONFIG = {
+  READY_THRESHOLD: 128 * 1024, // 128KB for faster startup
+  MAX_RETRIES: 50, // More stable connections
+  MAX_RETRY_DELAY: 30000, // Higher retry limits
+  // ...other settings
+};
 
-// More stable connections (higher retry limits)
-CONFIG.MAX_RETRIES = 50;
-CONFIG.MAX_RETRY_DELAY = 30000;
+export const PERF_CONFIG = {
+  MAX_CONCURRENT_TORRENTS: 20, // Handle more torrents
+  PIECE_SELECTION_BATCH_SIZE: 30, // Larger batches for high-speed connections
+  // ...other settings
+};
 ```
 
 ## 🔌 API Reference
@@ -514,12 +581,12 @@ Access the system monitoring dashboard at `/sysinfo` to view:
 
 ### Debug Mode
 
-Enable detailed logging by setting `CONFIG.DEBUG_MODE = true` in `player.js`:
+Enable detailed logging by setting `DEBUG_MODE = true` in `configs/all.config.js`:
 
 ```javascript
-// Enable debug logging
-const CONFIG = {
-  DEBUG_MODE: true, // Add this line
+// In configs/all.config.js
+export const PLAYER_CONFIG = {
+  DEBUG_MODE: true, // Enable debug logging
   // ... other config options
 };
 ```
