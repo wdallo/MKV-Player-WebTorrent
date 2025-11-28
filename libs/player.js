@@ -8,7 +8,7 @@ import { isValidMagnet } from "../utils/magnetValidator.js";
 
 // Configuration constants for player behavior and timeouts
 // Player configuration constants
-import { PLAYER_CONFIG } from "../config/all.config";
+import { PLAYER_CONFIG } from "../configs/all.config.js";
 
 // Make PLAYER_CONFIG available globally for UI access
 window.CONFIG = PLAYER_CONFIG;

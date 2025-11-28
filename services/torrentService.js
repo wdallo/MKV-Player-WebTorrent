@@ -4,7 +4,7 @@ import WebTorrent from "webtorrent";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import { PERF_CONFIG } from "../config/all.config.js";
+import { PERF_CONFIG } from "../configs/all.config.js";
 
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
