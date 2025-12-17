@@ -1,4 +1,11 @@
 // Enhanced magnet link validation utility with comprehensive security checks
+
+// Constants
+const MIN_MAGNET_LENGTH = 20;
+const MAX_MAGNET_LENGTH = 2048;
+const MIN_HASH_LENGTH = 32;
+const MAX_HASH_LENGTH = 40;
+
 export function isValidMagnet(url) {
   try {
     // Basic null/undefined/empty checks
@@ -8,7 +15,7 @@ export function isValidMagnet(url) {
 
     // Trim whitespace and validate length
     url = url.trim();
-    if (url.length < 20 || url.length > 2048) {
+    if (url.length < MIN_MAGNET_LENGTH || url.length > MAX_MAGNET_LENGTH) {
       return false;
     }
 
@@ -22,7 +29,9 @@ export function isValidMagnet(url) {
 
     // Additional security checks
     if (/[<>"'\\]/.test(url)) {
-      console.warn("Magnet URI contains potentially unsafe characters");
+      console.warn(
+        "[SECURITY] Magnet URI contains potentially unsafe characters"
+      );
       return false;
     }
 
@@ -34,7 +43,7 @@ export function isValidMagnet(url) {
 
     return true;
   } catch (error) {
-    console.error("Error validating magnet URI:", error);
+    console.error("[ERROR] Error validating magnet URI:", error);
     return false;
   }
 }
@@ -46,12 +55,14 @@ export function extractHashFromMagnet(url) {
       return null;
     }
 
-    const xtMatch = url.match(
-      /[?&]xt=urn:(btih|sha1|md5):([a-zA-Z0-9]{32,40})/i
+    const hashRegex = new RegExp(
+      `[?&]xt=urn:(btih|sha1|md5):([a-zA-Z0-9]{${MIN_HASH_LENGTH},${MAX_HASH_LENGTH}})`,
+      "i"
     );
+    const xtMatch = url.match(hashRegex);
     return xtMatch ? xtMatch[2] : null;
   } catch (error) {
-    console.error("Error extracting hash from magnet:", error);
+    console.error("[ERROR] Error extracting hash from magnet:", error);
     return null;
   }
 }
@@ -68,7 +79,7 @@ export function sanitizeMagnet(url) {
 
     return isValidMagnet(sanitized) ? sanitized : null;
   } catch (error) {
-    console.error("Error sanitizing magnet URI:", error);
+    console.error("[ERROR] Error sanitizing magnet URI:", error);
     return null;
   }
 }

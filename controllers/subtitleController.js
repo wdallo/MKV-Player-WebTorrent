@@ -7,6 +7,10 @@ import { getOrAddTorrent } from "../services/torrentService.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+// Constants
+const FFPROBE_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_TRACK_INDEX = 0;
+
 // Endpoint to list all subtitle tracks in the MKV
 export async function listSubtitleTracks(req, res) {
   const magnet = req.query.url;
@@ -32,8 +36,7 @@ export async function listSubtitleTracks(req, res) {
 
     const info = await ffprobe(videoUrl, {
       path: ffprobeStatic.path,
-      // Add timeout and connection options for streaming
-      timeout: 30000,
+      timeout: FFPROBE_TIMEOUT,
     });
 
     const tracks = info.streams
@@ -88,7 +91,7 @@ export function streamAssSubtitles(req, res) {
   };
   try {
     // Use ffmpeg to extract the selected subtitle stream as ASS from the video
-    const trackIndex = req.query.track || 0;
+    const trackIndex = req.query.track || DEFAULT_TRACK_INDEX;
     const videoUrl = `http://localhost:${
       process.env.PORT || 3000
     }/video?url=${encodeURIComponent(magnet)}`;

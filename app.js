@@ -27,7 +27,19 @@ app.use(rateLimiter);
 app.use(securityLogger);
 
 app.use(cors());
-app.use(compression());
+app.use(
+  compression({
+    level: 6,
+    threshold: 1024,
+    filter: (req, res) => {
+      // Don't compress media files
+      if (req.url.includes("/video") || req.url.includes("/audio")) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Support __dirname in ES modules
@@ -52,14 +64,30 @@ app.use(errorHandler);
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  // Don't exit the process in production
+  console.error("[ERROR] Unhandled Rejection at:", promise, "reason:", reason);
+  // Log stack trace if available
+  if (reason && reason.stack) {
+    console.error(reason.stack);
+  }
 });
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
-  // Don't exit the process in production
+  console.error("[ERROR] Uncaught Exception:", error);
+  if (error && error.stack) {
+    console.error(error.stack);
+  }
+});
+
+// Handle SIGTERM for graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("[INFO] SIGTERM received, starting graceful shutdown...");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  console.log("[INFO] SIGINT received, starting graceful shutdown...");
+  process.exit(0);
 });
 
 const PORT = process.env.PORT || 3000;

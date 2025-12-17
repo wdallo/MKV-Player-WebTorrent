@@ -18,6 +18,43 @@ import {
 const CONFIG = PLAYER_CONFIG;
 window.CONFIG = PLAYER_CONFIG;
 
+// Constants
+const CIRCUIT_BREAKER = {
+  MAX_ERRORS_PER_MINUTE: 10,
+  RESET_INTERVAL: 60000, // 1 minute
+  RELOAD_DELAY: 1000, // 1 second
+};
+
+const WATCHDOG = {
+  FREEZE_THRESHOLD: 30000, // 30 seconds
+  CHECK_INTERVAL: 5000, // 5 seconds
+  HEARTBEAT_INTERVAL: 1000, // 1 second
+};
+
+const MEMORY = {
+  HIGH_USAGE_THRESHOLD: 0.8, // 80% of limit
+  KB: 1024,
+  MB: 1024 * 1024,
+};
+
+const UI = {
+  STATUS_UPDATE_DEBOUNCE: 50, // ms
+  CONTEXT_MENU_DELAY: 50, // ms
+  CONTEXT_MENU_UPDATE_INTERVAL: 1000, // 1 second
+  CONTEXT_MENU_Z_INDEX: 10000,
+  LOADING_OVERLAY_Z_INDEX: 9999,
+};
+
+const HTTP_STATUS = {
+  OK: 200,
+  NOT_READY: "NOT_READY",
+};
+
+const RETRY = {
+  DELAY_INCREMENT: 500, // ms
+  POLL_DELAY: 500, // ms
+};
+
 // Emergency crash prevention - catch everything
 window.addEventListener("error", (e) => {
   console.error("EMERGENCY: Critical error caught:", e.error);
@@ -37,18 +74,17 @@ window.addEventListener("unhandledrejection", (e) => {
 // Circuit breaker to prevent infinite loops
 let globalErrorCount = 0;
 let lastErrorTime = 0;
-const MAX_ERRORS_PER_MINUTE = 10;
 
 function checkCircuitBreaker() {
   const now = Date.now();
-  if (now - lastErrorTime > 60000) {
+  if (now - lastErrorTime > CIRCUIT_BREAKER.RESET_INTERVAL) {
     globalErrorCount = 0; // Reset counter every minute
   }
   lastErrorTime = now;
 
-  if (++globalErrorCount > MAX_ERRORS_PER_MINUTE) {
-    console.error("CIRCUIT BREAKER: Too many errors, forcing page reload");
-    setTimeout(() => window.location.reload(), 1000);
+  if (++globalErrorCount > CIRCUIT_BREAKER.MAX_ERRORS_PER_MINUTE) {
+    console.error("[CIRCUIT BREAKER] Too many errors, forcing page reload");
+    setTimeout(() => window.location.reload(), CIRCUIT_BREAKER.RELOAD_DELAY);
     return true;
   }
   return false;
@@ -61,12 +97,11 @@ let lastHeartbeat = Date.now();
 function startWatchdog() {
   watchdogTimer = setInterval(() => {
     const now = Date.now();
-    if (now - lastHeartbeat > 30000) {
-      // 30 seconds without heartbeat
-      console.error("WATCHDOG: Page appears frozen, reloading...");
+    if (now - lastHeartbeat > WATCHDOG.FREEZE_THRESHOLD) {
+      console.error("[WATCHDOG] Page appears frozen, reloading...");
       window.location.reload();
     }
-  }, 5000);
+  }, WATCHDOG.CHECK_INTERVAL);
 }
 
 function heartbeat() {
@@ -75,7 +110,7 @@ function heartbeat() {
 
 // Start watchdog
 startWatchdog();
-setInterval(heartbeat, 1000); // Heartbeat every second
+setInterval(heartbeat, WATCHDOG.HEARTBEAT_INTERVAL);
 
 // Chrome Resource Management
 class ChromeResourceManager {
@@ -83,26 +118,26 @@ class ChromeResourceManager {
     try {
       if (performance && performance.memory) {
         const memInfo = {
-          used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
-          total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
-          limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024),
+          used: Math.round(performance.memory.usedJSHeapSize / MEMORY.MB),
+          total: Math.round(performance.memory.totalJSHeapSize / MEMORY.MB),
+          limit: Math.round(performance.memory.jsHeapSizeLimit / MEMORY.MB),
         };
 
         if (CONFIG.DEBUG_MODE) {
           console.log(
-            `Memory: ${memInfo.used}MB / ${memInfo.total}MB (Limit: ${memInfo.limit}MB)`
+            `[MEMORY] ${memInfo.used}MB / ${memInfo.total}MB (Limit: ${memInfo.limit}MB)`
           );
         }
 
-        // Trigger cleanup if memory usage is high (80% of limit)
-        if (memInfo.used > memInfo.limit * 0.8) {
-          console.warn("High memory usage detected, triggering cleanup");
+        // Trigger cleanup if memory usage is high
+        if (memInfo.used > memInfo.limit * MEMORY.HIGH_USAGE_THRESHOLD) {
+          console.warn("[MEMORY] High usage detected, triggering cleanup");
           this.forceGarbageCollection();
           return true; // High memory usage
         }
       }
     } catch (error) {
-      console.warn("Error monitoring memory:", error);
+      console.warn("[MEMORY] Error monitoring:", error);
     }
     return false;
   }
@@ -120,10 +155,10 @@ class ChromeResourceManager {
           if (el._cached) delete el._cached;
         });
       } catch (domError) {
-        console.warn("Error clearing DOM cache:", domError);
+        console.warn("[MEMORY] Error clearing DOM cache:", domError);
       }
     } catch (error) {
-      console.warn("Error forcing garbage collection:", error);
+      console.warn("[MEMORY] Error forcing garbage collection:", error);
     }
   }
 
@@ -134,7 +169,9 @@ class ChromeResourceManager {
       // Reduce video quality if high memory usage
       if (this.monitorMemory()) {
         videoElement.style.filter = "contrast(1.1)";
-        console.log("Applied memory optimization to video element");
+        if (CONFIG.DEBUG_MODE) {
+          console.log("[MEMORY] Applied optimization to video element");
+        }
       }
 
       // Preload optimization
@@ -197,7 +234,7 @@ class UIController {
 
       this.bindEvents();
     } catch (error) {
-      console.error("Error initializing UIController:", error);
+      console.error("[UI] Error initializing UIController:", error);
       this.elements = {};
     }
   }
@@ -207,7 +244,7 @@ class UIController {
     try {
       return document.getElementById(id);
     } catch (error) {
-      console.warn(`Failed to get element with id: ${id}`, error);
+      console.warn(`[UI] Failed to get element with id: ${id}`, error);
       return null;
     }
   }
@@ -277,9 +314,9 @@ class UIController {
         }
 
         const percentage = (data.progress * 100).toFixed(1);
-        const speedKB = (data.downloadSpeed / 1024).toFixed(1);
-        const downloadedMB = (data.downloaded / (1024 * 1024)).toFixed(2);
-        const totalMB = (data.length / (1024 * 1024)).toFixed(2);
+        const speedKB = (data.downloadSpeed / MEMORY.KB).toFixed(1);
+        const downloadedMB = (data.downloaded / MEMORY.MB).toFixed(2);
+        const totalMB = (data.length / MEMORY.MB).toFixed(2);
 
         const message = this.formatStatusMessage(data, {
           percentage,
@@ -303,8 +340,8 @@ class UIController {
           this.elements.statusDetails.style.display = "";
         }
       },
-      50
-    ); // Faster debounce for status updates
+      UI.STATUS_UPDATE_DEBOUNCE
+    );
   }
 
   // Formats the status message for the user
@@ -606,10 +643,9 @@ class UIController {
     };
 
     // Use mousedown instead of click for better responsiveness
-    // Add a longer delay to ensure the context menu is properly positioned first
     setTimeout(() => {
       document.addEventListener("mousedown", hideMenu);
-    }, 50);
+    }, UI.CONTEXT_MENU_DELAY);
 
     return contextMenu;
   }
@@ -778,7 +814,7 @@ class UIController {
           ? subtitles.lastSubtitleContent.length
           : 0;
         const eventCount = subtitles.lastEventCount || 0;
-        const contentSizeKB = (contentLength / 1024).toFixed(1);
+        const contentSizeKB = (contentLength / MEMORY.KB).toFixed(1);
 
         // Show detailed progress information
         subtitleProgressEl.textContent = "";
@@ -925,7 +961,7 @@ class UIController {
           this.showContextMenu(e.clientX, e.clientY);
         });
       }
-    }, 1000);
+    }, UI.CONTEXT_MENU_UPDATE_INTERVAL);
   }
 
   // Cleanup method for better memory management
@@ -977,7 +1013,7 @@ class RetryController {
   // Calculate delay for next retry
   getRetryDelay() {
     return Math.min(
-      CONFIG.BASE_RETRY_DELAY + this.retryCount * 500,
+      CONFIG.BASE_RETRY_DELAY + this.retryCount * RETRY.DELAY_INCREMENT,
       CONFIG.MAX_RETRY_DELAY
     );
   }
@@ -1139,20 +1175,26 @@ class ResourceLoader {
           },
         });
         const text = await response.text();
-        if (response.status === 200 && text !== "NOT_READY") {
+        if (
+          response.status === HTTP_STATUS.OK &&
+          text !== HTTP_STATUS.NOT_READY
+        ) {
           // Resource is ready
           return isText ? text : url;
-        } else if (response.status === 200 && text === "NOT_READY") {
+        } else if (
+          response.status === HTTP_STATUS.OK &&
+          text === HTTP_STATUS.NOT_READY
+        ) {
           // Resource not ready yet, continue polling
         }
       } catch (error) {
         // Network error, continue polling
       }
 
-      await this.delay(500);
+      await this.delay(RETRY.POLL_DELAY);
     }
 
-    console.error(`Timeout waiting for ${url}`);
+    console.error(`[RESOURCE] Timeout waiting for ${url}`);
     throw new Error(`Timeout waiting for ${url}`);
   }
 
@@ -1201,13 +1243,13 @@ class SubtitlesManager {
       } else {
         if (CONFIG.DEBUG_MODE)
           console.log(
-            "Failed to fetch subtitle tracks, status:",
+            "[SUBTITLES] Failed to fetch tracks, status:",
             response.status
           );
       }
     } catch (error) {
       if (CONFIG.DEBUG_MODE)
-        console.log("Failed to fetch subtitle tracks:", error);
+        console.log("[SUBTITLES] Failed to fetch tracks:", error);
     }
     return [];
   }
@@ -1226,7 +1268,7 @@ class SubtitlesManager {
       display: none;
       bottom: 60px;
       right: 20px;
-      z-index: 9999;
+      z-index: ${UI.LOADING_OVERLAY_Z_INDEX};
       background: rgba(0, 0, 0, 0.9);
       padding: 8px 0;
       border-radius: 8px;

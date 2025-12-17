@@ -8,6 +8,11 @@ import { getOrAddTorrent } from "../services/torrentService.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+// Constants
+const MIN_DOWNLOAD_SIZE = 1024 * 1024; // 1MB minimum for analysis/streaming
+const FFPROBE_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_TRACK_INDEX = 0;
+
 // Endpoint to list all audio tracks in the MKV
 export async function listAudioTracks(req, res) {
   const magnet = req.query.url;
@@ -32,8 +37,7 @@ export async function listAudioTracks(req, res) {
     const downloadPath = path.join(process.cwd(), "downloads", videoFile.name);
 
     // Check if enough of the file is downloaded for ffprobe analysis
-    if (videoFile.downloaded < 1024 * 1024) {
-      // Need at least 1MB
+    if (videoFile.downloaded < MIN_DOWNLOAD_SIZE) {
       res.json([]);
       return;
     }
@@ -41,7 +45,7 @@ export async function listAudioTracks(req, res) {
     // Use the download path for ffprobe analysis
     const info = await ffprobe(downloadPath, {
       path: ffprobeStatic.path,
-      timeout: 30000,
+      timeout: FFPROBE_TIMEOUT,
     });
     const tracks = info.streams
       .filter((s) => s.codec_type === "audio")
@@ -68,7 +72,7 @@ export async function listAudioTracks(req, res) {
 // Stream specific audio track as WebM/Opus for web compatibility
 export function streamAudioTrack(req, res) {
   const magnet = req.query.url;
-  const trackIndex = parseInt(req.query.track) || 0;
+  const trackIndex = parseInt(req.query.track) || DEFAULT_TRACK_INDEX;
 
   if (!magnet) return res.status(400).send("Missing url param");
 
@@ -81,8 +85,7 @@ export function streamAudioTrack(req, res) {
   const videoFile = state.videoFile;
 
   // Check if enough of the file is downloaded for streaming
-  if (videoFile.downloaded < 1024 * 1024) {
-    // Need at least 1MB
+  if (videoFile.downloaded < MIN_DOWNLOAD_SIZE) {
     res.status(200).send("NOT_READY");
     return;
   }

@@ -12,8 +12,10 @@ import ffmpegPath from "ffmpeg-static";
 // Set FFmpeg path
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+// Constants
 const MIN_READY_BYTES = 256 * 1024; // 256KB for ultra-fast start
 const PRIORITY_PIECES = 20; // Download first 20 pieces with priority
+const RANGE_ADJUSTMENT_THRESHOLD = 80; // Adjust range at 80%+ download
 
 // Streams video content for a given magnet link, supporting HTTP range requests
 export function streamVideo(req, res) {
@@ -73,14 +75,16 @@ export function streamVideo(req, res) {
     videoFile._torrent && videoFile._torrent.bitfield
       ? videoFile._torrent.bitfield.get(firstPiece)
       : false;
-  // If more than 256KB is downloaded, allow streaming
-  if (videoFile.downloaded >= MIN_READY_BYTES) {
-  } else if (videoFile.downloaded < MIN_READY_BYTES || !firstPieceDownloaded) {
-    // Not enough data to start streaming
+
+  // Check if enough data is available to start streaming
+  if (videoFile.downloaded < MIN_READY_BYTES || !firstPieceDownloaded) {
     console.log(
-      `[VIDEO] Not enough data: downloaded=${videoFile.downloaded} bytes, need at least ${MIN_READY_BYTES} bytes for ${videoFile.name}`
+      `[VIDEO] Not ready: downloaded=${
+        videoFile.downloaded
+      }B/${MIN_READY_BYTES}B, firstPiece=${!!firstPieceDownloaded} for ${
+        videoFile.name
+      }`
     );
-    console.log(`[VIDEO] First piece downloaded: ${!!firstPieceDownloaded}`);
     res.status(200).send("NOT_READY");
     return;
   }
@@ -122,8 +126,8 @@ export function streamVideo(req, res) {
   if (start > lastDownloadedByte) {
     const downloadPercentage = (videoFile.downloaded / fileLength) * 100;
 
-    // Be more lenient with range adjustments - allow at 80%+ instead of 90%+
-    if (downloadPercentage > 80 && start < fileLength) {
+    // Be more lenient with range adjustments at 80%+ download
+    if (downloadPercentage > RANGE_ADJUSTMENT_THRESHOLD && start < fileLength) {
       // Adjust the start to the nearest available byte
       const adjustedStart = Math.min(start, lastDownloadedByte);
       console.log(
