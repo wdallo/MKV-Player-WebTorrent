@@ -80,14 +80,14 @@ try {
 
 // Create a WebTorrent client with optimized performance settings
 const client = new WebTorrent({
-  maxConns: 35, // Optimized connection limit
+  maxConns: 50, // Increased connection limit for better performance
   nodeId: null, // Random node ID
   peerId: null, // Random peer ID
   tracker: {
     announce: [], // Will use default trackers
     getAnnounceOpts() {
       return {
-        numwant: 50, // Request more peers
+        numwant: 80, // Request more peers for better connectivity
         compact: 1, // Compact response
       };
     },
@@ -99,7 +99,9 @@ const client = new WebTorrent({
   blocklist: false, // Disable blocklist for speed
   // Performance optimizations
   downloadLimit: -1, // No download limit
-  uploadLimit: 1024 * 1024, // 1MB/s upload limit to preserve bandwidth
+  uploadLimit: 2 * 1024 * 1024, // 2MB/s upload limit for better seeding
+  // Additional performance options
+  chunkSize: 16384, // 16KB chunks for better streaming
 });
 
 // Store all active torrents and their state with performance tracking
@@ -131,19 +133,40 @@ function selectPiecesOptimized(videoFile, seekPosition = 0) {
   const totalPieces = Math.floor(videoFile.length / pieceLength);
   const startPiece = Math.floor(seekPosition / pieceLength);
 
-  // Select pieces in smaller batches for better performance
-  const batchSize = Math.min(
-    PERF_CONFIG.PIECE_SELECTION_BATCH_SIZE,
+  // Dynamic batch size based on file size and network conditions
+  const dynamicBatchSize = Math.min(
+    Math.max(PERF_CONFIG.PIECE_SELECTION_BATCH_SIZE, totalPieces * 0.1),
     totalPieces
   );
 
-  for (let i = 0; i < batchSize; i += PERF_CONFIG.PIECE_SELECTION_INTERVAL) {
+  // Priority zones: critical (immediate), high (next 20), normal (rest)
+  const criticalZone = Math.min(5, dynamicBatchSize);
+  const highPriorityZone = Math.min(20, dynamicBatchSize);
+
+  for (
+    let i = 0;
+    i < dynamicBatchSize;
+    i += Math.max(1, PERF_CONFIG.PIECE_SELECTION_INTERVAL)
+  ) {
     const pieceIndex = (startPiece + i) % totalPieces;
     const start = pieceIndex * pieceLength;
     const end = Math.min(start + pieceLength - 1, videoFile.length - 1);
 
     if (start < videoFile.length) {
-      videoFile.select(start, end, i < 10); // High priority for first 10 pieces
+      // Assign priority based on distance from seek position
+      const priority = i < criticalZone ? 2 : i < highPriorityZone ? 1 : 0;
+      videoFile.select(start, end, priority > 0);
+    }
+  }
+
+  // Also select end pieces for better buffering
+  const endPieces = Math.min(5, totalPieces - startPiece - dynamicBatchSize);
+  for (let i = 0; i < endPieces; i++) {
+    const pieceIndex = totalPieces - 1 - i;
+    const start = pieceIndex * pieceLength;
+    const end = Math.min(start + pieceLength - 1, videoFile.length - 1);
+    if (start < videoFile.length) {
+      videoFile.select(start, end, false);
     }
   }
 }
@@ -313,31 +336,61 @@ function cleanupOldTorrents() {
   }
 }
 
-// Enhanced resource usage monitoring with performance metrics
+// Enhanced resource usage monitoring with adaptive cleanup and better metrics
 function logResourceUsage() {
   try {
     const mem = process.memoryUsage();
     const activeTorrents = Object.keys(torrents).length;
     const cacheSize = torrentCache.size;
+    const cpuUsage = process.cpuUsage();
 
-    // Performance metrics
+    // Performance metrics with additional data
     const metrics = {
       activeTorrents,
       cacheSize,
       memoryRSS: Math.round(mem.rss / 1024 / 1024), // MB
       memoryHeap: Math.round(mem.heapUsed / 1024 / 1024), // MB
+      memoryExternal: Math.round(mem.external / 1024 / 1024), // MB
       uptime: Math.round(process.uptime() / 60), // minutes
+      cpuUser: Math.round(cpuUsage.user / 1000), // ms
+      cpuSystem: Math.round(cpuUsage.system / 1000), // ms
     };
 
-    // Log warnings for performance issues
-    if (activeTorrents > PERF_CONFIG.MAX_CONCURRENT_TORRENTS) {
-      console.warn(`[PERF] High active torrent count: ${activeTorrents}`);
+    // Adaptive thresholds based on system resources
+    const memoryThreshold = process.arch === "x64" ? 2048 : 1024; // MB
+    const adaptiveMaxTorrents = Math.max(
+      5,
+      PERF_CONFIG.MAX_CONCURRENT_TORRENTS - Math.floor(metrics.memoryRSS / 200)
+    );
+
+    // Log warnings and take action for performance issues
+    if (activeTorrents > adaptiveMaxTorrents) {
+      console.warn(
+        `[PERF] High active torrent count: ${activeTorrents} (adaptive limit: ${adaptiveMaxTorrents})`
+      );
       cleanupOldTorrents();
     }
 
-    if (mem.rss > 1.5 * 1024 * 1024 * 1024) {
-      // 1.5GB
-      console.warn(`[PERF] High memory usage: ${metrics.memoryRSS} MB`);
+    if (mem.rss > memoryThreshold * 1024 * 1024) {
+      console.warn(
+        `[PERF] High memory usage: ${metrics.memoryRSS} MB (threshold: ${memoryThreshold} MB)`
+      );
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+        console.log("[PERF] Forced garbage collection");
+      }
+    }
+
+    // Cache size management
+    if (cacheSize > 100) {
+      const entriesToRemove = Math.floor(cacheSize * 0.3);
+      const oldestEntries = Array.from(torrentCache.entries())
+        .sort((a, b) => a[1].cachedAt - b[1].cachedAt)
+        .slice(0, entriesToRemove);
+
+      oldestEntries.forEach(([key]) => torrentCache.delete(key));
+      console.log(`[PERF] Cleaned ${entriesToRemove} old cache entries`);
     }
 
     if (process.env.NODE_ENV !== "production") {
@@ -346,8 +399,13 @@ function logResourceUsage() {
   } catch (error) {
     console.error("Error logging resource usage:", error);
   } finally {
-    // Schedule next check
-    setTimeout(logResourceUsage, PERF_CONFIG.RESOURCE_LOG_INTERVAL);
+    // Adaptive monitoring interval based on load
+    const currentActiveTorrents = Object.keys(torrents).length;
+    const interval =
+      currentActiveTorrents > 5
+        ? PERF_CONFIG.RESOURCE_LOG_INTERVAL / 2
+        : PERF_CONFIG.RESOURCE_LOG_INTERVAL;
+    setTimeout(logResourceUsage, interval);
   }
 }
 

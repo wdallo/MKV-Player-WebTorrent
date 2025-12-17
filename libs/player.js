@@ -8,10 +8,147 @@ import { isValidMagnet } from "../utils/magnetValidator.js";
 
 // Configuration constants for player behavior and timeouts
 // Player configuration constants
-import { PLAYER_CONFIG } from "../configs/all.config.js";
+import {
+  PLAYER_CONFIG,
+  PLYR_CONFIG,
+  PLYR_THEME,
+} from "../configs/all.config.js";
 
 // Make PLAYER_CONFIG available globally for UI access
+const CONFIG = PLAYER_CONFIG;
 window.CONFIG = PLAYER_CONFIG;
+
+// Emergency crash prevention - catch everything
+window.addEventListener("error", (e) => {
+  console.error("EMERGENCY: Critical error caught:", e.error);
+  if (checkCircuitBreaker()) return false;
+  e.preventDefault();
+  return false;
+});
+
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("EMERGENCY: Critical promise rejection:", e.reason);
+  if (checkCircuitBreaker()) return false;
+  e.preventDefault();
+  return false;
+});
+
+// Prevent STATUS_BREAKPOINT by catching all possible crashes
+// Circuit breaker to prevent infinite loops
+let globalErrorCount = 0;
+let lastErrorTime = 0;
+const MAX_ERRORS_PER_MINUTE = 10;
+
+function checkCircuitBreaker() {
+  const now = Date.now();
+  if (now - lastErrorTime > 60000) {
+    globalErrorCount = 0; // Reset counter every minute
+  }
+  lastErrorTime = now;
+
+  if (++globalErrorCount > MAX_ERRORS_PER_MINUTE) {
+    console.error("CIRCUIT BREAKER: Too many errors, forcing page reload");
+    setTimeout(() => window.location.reload(), 1000);
+    return true;
+  }
+  return false;
+}
+
+// Watchdog timer to detect page freeze
+let watchdogTimer;
+let lastHeartbeat = Date.now();
+
+function startWatchdog() {
+  watchdogTimer = setInterval(() => {
+    const now = Date.now();
+    if (now - lastHeartbeat > 30000) {
+      // 30 seconds without heartbeat
+      console.error("WATCHDOG: Page appears frozen, reloading...");
+      window.location.reload();
+    }
+  }, 5000);
+}
+
+function heartbeat() {
+  lastHeartbeat = Date.now();
+}
+
+// Start watchdog
+startWatchdog();
+setInterval(heartbeat, 1000); // Heartbeat every second
+
+// Chrome Resource Management
+class ChromeResourceManager {
+  static monitorMemory() {
+    try {
+      if (performance && performance.memory) {
+        const memInfo = {
+          used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+          total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+          limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024),
+        };
+
+        if (CONFIG.DEBUG_MODE) {
+          console.log(
+            `Memory: ${memInfo.used}MB / ${memInfo.total}MB (Limit: ${memInfo.limit}MB)`
+          );
+        }
+
+        // Trigger cleanup if memory usage is high (80% of limit)
+        if (memInfo.used > memInfo.limit * 0.8) {
+          console.warn("High memory usage detected, triggering cleanup");
+          this.forceGarbageCollection();
+          return true; // High memory usage
+        }
+      }
+    } catch (error) {
+      console.warn("Error monitoring memory:", error);
+    }
+    return false;
+  }
+
+  static forceGarbageCollection() {
+    try {
+      // Force garbage collection if available
+      if (window.gc) {
+        window.gc();
+      }
+
+      // Clear DOM caches safely
+      try {
+        document.querySelectorAll("*").forEach((el) => {
+          if (el._cached) delete el._cached;
+        });
+      } catch (domError) {
+        console.warn("Error clearing DOM cache:", domError);
+      }
+    } catch (error) {
+      console.warn("Error forcing garbage collection:", error);
+    }
+  }
+
+  static optimizeVideo(videoElement) {
+    try {
+      if (!videoElement) return;
+
+      // Reduce video quality if high memory usage
+      if (this.monitorMemory()) {
+        videoElement.style.filter = "contrast(1.1)";
+        console.log("Applied memory optimization to video element");
+      }
+
+      // Preload optimization
+      videoElement.preload = "metadata";
+
+      // Disable picture-in-picture to save memory
+      if (videoElement.disablePictureInPicture !== undefined) {
+        videoElement.disablePictureInPicture = true;
+      }
+    } catch (error) {
+      console.warn("Error optimizing video:", error);
+    }
+  }
+}
 
 // Type definitions (for better code documentation)
 /**
@@ -30,28 +167,49 @@ window.CONFIG = PLAYER_CONFIG;
  */
 class UIController {
   constructor() {
-    // Cache references to important DOM elements
-    this.elements = {
-      progressBar: document.getElementById("progress-bar"),
-      statusDetails: document.getElementById("status-details"),
-      loading: document.getElementById("loading"),
-      error: document.getElementById("error"),
-      statusMsg: document.getElementById("status-msg"),
-      retryBtn: document.getElementById("retry-btn"),
-      videoContainer: document.getElementById("video-container"),
-      plyrLoadingOverlay: document.getElementById("plyr-loading-overlay"),
-      video: document.getElementById("player"),
-      resumeBtn: document.getElementById("resume-btn"),
-      restartBtn: document.getElementById("restart-btn"),
-      resumeModule: document.getElementById("resume-module-inner"),
-    };
+    try {
+      // Chrome resource optimization
+      const playerElement = document.getElementById("player");
+      if (playerElement) {
+        ChromeResourceManager.optimizeVideo(playerElement);
+      }
 
-    // Performance optimizations
-    this._domCache = new Map();
-    this._lastCacheTime = 0;
-    this._debounceTimers = new Map();
+      // Cache references to important DOM elements with safe access
+      this.elements = {
+        progressBar: this.safeGetElement("progress-bar"),
+        statusDetails: this.safeGetElement("status-details"),
+        loading: this.safeGetElement("loading"),
+        error: this.safeGetElement("error"),
+        statusMsg: this.safeGetElement("status-msg"),
+        retryBtn: this.safeGetElement("retry-btn"),
+        videoContainer: this.safeGetElement("video-container"),
+        plyrLoadingOverlay: this.safeGetElement("plyr-loading-overlay"),
+        video: this.safeGetElement("player"),
+        resumeBtn: this.safeGetElement("resume-btn"),
+        restartBtn: this.safeGetElement("restart-btn"),
+        resumeModule: this.safeGetElement("resume-module-inner"),
+      };
 
-    this.bindEvents();
+      // Performance optimizations
+      this._domCache = new Map();
+      this._lastCacheTime = 0;
+      this._debounceTimers = new Map();
+
+      this.bindEvents();
+    } catch (error) {
+      console.error("Error initializing UIController:", error);
+      this.elements = {};
+    }
+  }
+
+  // Safe DOM element access to prevent crashes
+  safeGetElement(id) {
+    try {
+      return document.getElementById(id);
+    } catch (error) {
+      console.warn(`Failed to get element with id: ${id}`, error);
+      return null;
+    }
   }
 
   // Bind UI events, such as retry button click
@@ -101,6 +259,9 @@ class UIController {
    * @param {TorrentStatus} data - Torrent status data
    */
   updateStatusBar(data) {
+    // Check memory usage before heavy DOM updates
+    ChromeResourceManager.monitorMemory();
+
     this._debounce(
       "statusUpdate",
       () => {
@@ -166,8 +327,7 @@ class UIController {
       data.noPeersSince &&
       Date.now() - data.noPeersSince > CONFIG.STALL_TIMEOUT
     ) {
-      message +=
-        ' <span style="color:#ff5555">No seeds found or torrent stalled. Try another torrent.</span>';
+      message += " No seeds found or torrent stalled. Try another torrent.";
     }
 
     return message;
@@ -779,6 +939,12 @@ class UIController {
     // Clear DOM cache
     this._domCache.clear();
 
+    // Chrome resource cleanup
+    ChromeResourceManager.forceGarbageCollection();
+
+    // Chrome resource cleanup
+    ChromeResourceManager.forceGarbageCollection();
+
     // Remove context menu if exists
     this.removeContextMenu();
 
@@ -876,25 +1042,46 @@ class StatusPoller {
   // Start polling the server for torrent status
   async start(onStatusUpdate) {
     this.isActive = true;
+    let memoryCheckCounter = 0;
 
     while (this.isActive) {
+      // Check memory every 10 polls to prevent Chrome resource exhaustion
+      if (memoryCheckCounter++ % 10 === 0) {
+        if (ChromeResourceManager.monitorMemory()) {
+          console.warn("High memory usage during status polling");
+          // Slow down polling when memory is high
+          await this.delay(CONFIG.STATUS_POLL_INTERVAL * 2);
+          continue;
+        }
+      }
       try {
         const response = await fetch(
           `/status?url=${encodeURIComponent(this.magnetUrl)}`
         );
 
         if (response.ok) {
-          const data = await response.json();
-          this.updateNoPeersTracking(data);
-          onStatusUpdate(data);
+          try {
+            const data = await response.json();
+            this.updateNoPeersTracking(data);
+            onStatusUpdate(data);
+          } catch (parseError) {
+            console.error("Failed to parse status response:", parseError);
+            onStatusUpdate(null, "Failed to parse server response.");
+          }
         } else {
           onStatusUpdate(null, "Waiting for torrent status...");
         }
       } catch (error) {
+        console.error("Status fetch error:", error);
         onStatusUpdate(null, "Error fetching torrent status.");
       }
 
-      await this.delay(CONFIG.STATUS_POLL_INTERVAL);
+      try {
+        await this.delay(CONFIG.STATUS_POLL_INTERVAL);
+      } catch (delayError) {
+        console.error("Delay error in status poller:", delayError);
+        break;
+      }
     }
   }
 
@@ -965,6 +1152,7 @@ class ResourceLoader {
       await this.delay(500);
     }
 
+    console.error(`Timeout waiting for ${url}`);
     throw new Error(`Timeout waiting for ${url}`);
   }
 
@@ -1211,11 +1399,95 @@ class SubtitlesManager {
       }
       document.addEventListener("mousedown", handleOutsideClick);
     }, 0);
+
+    // Create subtitle button if it doesn't exist
+    if (!document.getElementById("plyr-subtitles-btn")) {
+      const subtitlesBtn = document.createElement("button");
+      subtitlesBtn.id = "plyr-subtitles-btn";
+      subtitlesBtn.className = "plyr__control plyr__subtitles-btn";
+      subtitlesBtn.type = "button";
+      subtitlesBtn.setAttribute("aria-label", "Subtitles");
+
+      // Create SVG securely with DOM methods
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("width", "32");
+      svg.setAttribute("height", "32");
+      svg.setAttribute("viewBox", "0 0 32 32");
+
+      const g = document.createElementNS(svgNS, "g");
+      g.setAttribute("id", "cc");
+
+      const path1 = document.createElementNS(svgNS, "path");
+      path1.setAttribute("fill", "#ffffffff");
+      path1.setAttribute(
+        "d",
+        "M14,23H6a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H6a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"
+      );
+
+      const path2 = document.createElementNS(svgNS, "path");
+      path2.setAttribute("fill", "#ffffffff");
+      path2.setAttribute(
+        "d",
+        "M28,23H20a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H20a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"
+      );
+
+      g.appendChild(path1);
+      g.appendChild(path2);
+      svg.appendChild(g);
+      subtitlesBtn.appendChild(svg);
+
+      // Style the button
+      subtitlesBtn.style.cssText = `
+        margin: 0 8px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 5px;
+        border-radius: 4px;
+        color: #fff;
+        transition: all 0.2s ease;
+      `;
+
+      // Add hover effects
+      let isHovered = false;
+      subtitlesBtn.addEventListener("mouseenter", () => {
+        if (!isHovered) {
+          isHovered = true;
+          subtitlesBtn.style.background = "rgba(35, 40, 47, 0.95)";
+        }
+      });
+      subtitlesBtn.addEventListener("mouseleave", () => {
+        if (isHovered) {
+          isHovered = false;
+          subtitlesBtn.style.background = "none";
+        }
+      });
+
+      // Click handler
+      subtitlesBtn.addEventListener("click", () => {
+        const selector = document.getElementById("subtitle-selector-container");
+        if (selector) {
+          const isVisible = selector.style.display !== "block";
+          selector.style.display = isVisible ? "block" : "none";
+        }
+      });
+
+      // Add to Plyr controls
+      addToPlyrControlsBar(subtitlesBtn, {
+        before: '[data-plyr="fullscreen"]',
+      });
+    }
   }
 
   // Remove subtitle selector UI
   removeSubtitleSelector() {
+    const existingBtn = document.getElementById("plyr-subtitles-btn");
     const existing = document.getElementById("subtitle-selector-container");
+    if (existingBtn) existingBtn.remove();
     if (existing) {
       existing.remove();
     }
@@ -1409,6 +1681,21 @@ class SubtitlesManager {
     }
 
     if (typeof window.SubtitlesOctopus !== "undefined") {
+      // Get screen dimensions for proper sizing
+      const screenWidth = window.screen.width;
+      const screenHeight = window.screen.height;
+      const videoRect = this.videoElement.getBoundingClientRect();
+
+      // Calculate appropriate font size based on video size
+      const baseFontSize = Math.max(
+        16,
+        Math.min(32, Math.floor(videoRect.width / 40))
+      );
+      const fullscreenFontSize = Math.max(
+        24,
+        Math.min(48, Math.floor(screenWidth / 60))
+      );
+
       this.octopus = new window.SubtitlesOctopus({
         video: this.videoElement,
         subContent: subtitleContent,
@@ -1417,11 +1704,37 @@ class SubtitlesManager {
         fallbackFont: "/libs/fonts/ARIALBD.TTF",
         renderMode: "wasm-blend",
         targetFps: 24,
+        // Enhanced sizing configuration
+        prescaleFactor: 1.0,
+        prescaleHeightLimit: screenHeight,
+        maxRenderHeight: screenHeight,
+        // Dynamic sizing based on screen
+        onReady: () => {
+          if (this.octopus && this.octopus.setTargetSize) {
+            // Set target size for proper scaling
+            this.octopus.setTargetSize(videoRect.width, videoRect.height);
+          }
+        },
+        // Handle fullscreen changes
+        onFullscreenChange: (isFullscreen) => {
+          if (this.octopus && this.octopus.setTargetSize) {
+            if (isFullscreen) {
+              this.octopus.setTargetSize(screenWidth, screenHeight);
+            } else {
+              const newRect = this.videoElement.getBoundingClientRect();
+              this.octopus.setTargetSize(newRect.width, newRect.height);
+            }
+          }
+        },
       });
       this.initialized = true;
       this.startPollingForUpdates();
     } else {
-      throw new Error("SubtitlesOctopus not loaded!");
+      console.error("SubtitlesOctopus not loaded!");
+      this.ui.showError(
+        "Subtitle engine failed to load. Video will play without subtitles."
+      );
+      return false;
     }
   }
 
@@ -1663,7 +1976,9 @@ class VideoPlayerController {
   constructor(magnetUrl) {
     // Validate magnet URL before proceeding
     if (!isValidMagnet(magnetUrl)) {
-      throw new Error("Invalid or missing magnet URL provided");
+      console.error("Invalid or missing magnet URL provided:", magnetUrl);
+      this.error = "Invalid or missing magnet URL provided";
+      return;
     }
 
     this._suppressResumePrompt = false;
@@ -1686,6 +2001,9 @@ class VideoPlayerController {
     this.playerInitialized = false;
     this.playerStarted = false;
     this.plyrInstance = null;
+
+    // Apply Plyr theme from config
+    this.applyPlyrTheme();
     this.subtitlesLoaded = false; // Track if subtitles are loaded
     this.audioTracksLoaded = false; // Track if audio tracks are loaded
     this.currentAudioTrack = 0; // Current audio track index
@@ -1703,11 +2021,80 @@ class VideoPlayerController {
     this.bindEvents();
     this.checkInitialState();
 
+    // Add global error handlers to prevent STATUS_BREAKPOINT
+    this.setupGlobalErrorHandlers();
+
+    // Setup periodic memory monitoring (every 30 seconds)
+    this.memoryMonitorInterval = setInterval(() => {
+      if (ChromeResourceManager.monitorMemory()) {
+        console.warn("High memory usage detected during playback");
+        // Reduce video quality or perform other optimizations
+        if (this.ui.elements.video) {
+          ChromeResourceManager.optimizeVideo(this.ui.elements.video);
+        }
+      }
+    }, 30000);
+
     // Initialize fullscreen controller
     this.fullscreenController = new FullscreenController();
 
     // Listen for localStorage changes from other tabs/windows
     this.setupCrossTabCleanup();
+  }
+
+  // Setup global error handlers to prevent STATUS_BREAKPOINT errors
+  setupGlobalErrorHandlers() {
+    // Handle uncaught JavaScript errors
+    window.addEventListener("error", (event) => {
+      console.error("Global error caught:", event.error);
+
+      // Check if error is memory-related
+      const isMemoryError =
+        event.error?.message?.includes("memory") ||
+        event.error?.message?.includes("Maximum call stack") ||
+        event.error?.name === "RangeError";
+
+      if (isMemoryError || ChromeResourceManager.monitorMemory()) {
+        console.warn("Memory-related error detected, forcing cleanup");
+        ChromeResourceManager.forceGarbageCollection();
+      }
+
+      if (CONFIG.DEBUG_MODE) {
+        console.error("Error details:", {
+          message: event.message,
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          stack: event.error?.stack,
+        });
+      }
+
+      // Prevent default error handling that might cause STATUS_BREAKPOINT
+      event.preventDefault();
+
+      // Show user-friendly error
+      if (this.ui) {
+        this.ui.showError(
+          "An unexpected error occurred. Please refresh the page."
+        );
+      }
+    });
+
+    // Handle unhandled promise rejections
+    window.addEventListener("unhandledrejection", (event) => {
+      console.error("Unhandled promise rejection:", event.reason);
+      if (CONFIG.DEBUG_MODE) {
+        console.error("Promise rejection details:", event);
+      }
+
+      // Prevent default handling
+      event.preventDefault();
+
+      // Show user-friendly error
+      if (this.ui && !event.reason?.message?.includes("fetch")) {
+        this.ui.showError("A network or processing error occurred.");
+      }
+    });
   }
 
   // Setup cross-tab localStorage cleanup detection
@@ -1739,10 +2126,23 @@ class VideoPlayerController {
     const video = this.ui.elements.video;
     const passiveOptions = { passive: true };
 
-    video.addEventListener("error", () => this.handleVideoError());
+    video.addEventListener("error", () => {
+      try {
+        this.handleVideoError();
+      } catch (error) {
+        console.error("Error in video error handler:", error);
+        this.ui.showError("Critical video error occurred. Please refresh.");
+      }
+    });
     video.addEventListener(
       "canplay",
-      () => this.handleVideoCanPlay(),
+      () => {
+        try {
+          this.handleVideoCanPlay();
+        } catch (error) {
+          console.error("Error in canplay handler:", error);
+        }
+      },
       passiveOptions
     );
     video.addEventListener(
@@ -1771,16 +2171,25 @@ class VideoPlayerController {
     video.addEventListener(
       "timeupdate",
       () => {
-        const now = Date.now();
-        // Only save every 2 seconds to reduce localStorage writes
-        if (now - lastSaveTime > 2000) {
-          const t = video.currentTime;
-          const duration = video.duration;
-          // Only save if playing, time > 0, and not at end
-          if (!video.paused && t > 0 && t < duration - 1) {
-            localStorage.setItem(this.resumeTimeKey, t.toFixed(2));
-            lastSaveTime = now;
+        try {
+          const now = Date.now();
+          // Only save every 2 seconds to reduce localStorage writes
+          if (now - lastSaveTime > 2000) {
+            const t = video.currentTime;
+            const duration = video.duration;
+            // Only save if playing, time > 0, and not at end
+            if (!video.paused && t > 0 && t < duration - 1) {
+              try {
+                localStorage.setItem(this.resumeTimeKey, t.toFixed(2));
+                lastSaveTime = now;
+              } catch (storageError) {
+                console.warn("Failed to save resume time:", storageError);
+                // Don't update lastSaveTime so it will retry later
+              }
+            }
           }
+        } catch (error) {
+          console.warn("Error in timeupdate handler:", error);
         }
       },
       passiveOptions
@@ -1820,11 +2229,284 @@ class VideoPlayerController {
   }
 
   // Initialize the player and start loading resources
+  // Apply Plyr theme colors as CSS custom properties
+  applyPlyrTheme() {
+    const root = document.documentElement;
+
+    root.style.setProperty("--plyr-color-main", PLYR_THEME.primaryColor);
+    root.style.setProperty(
+      "--plyr-video-background",
+      PLYR_THEME.videoBackground
+    );
+    root.style.setProperty("--plyr-menu-background", PLYR_THEME.menuBackground);
+    root.style.setProperty("--plyr-menu-shadow", PLYR_THEME.menuShadow);
+    root.style.setProperty("--plyr-menu-color", PLYR_THEME.textColor);
+    root.style.setProperty("--plyr-video-control-color", PLYR_THEME.textColor);
+    root.style.setProperty(
+      "--plyr-video-control-color-hover",
+      PLYR_THEME.textColor
+    );
+    root.style.setProperty(
+      "--plyr-video-control-background-hover",
+      PLYR_THEME.controlBackgroundHover
+    );
+    root.style.setProperty(
+      "--plyr-tooltip-background",
+      PLYR_THEME.tooltipBackground
+    );
+    root.style.setProperty("--plyr-tooltip-color", PLYR_THEME.tooltipColor);
+    root.style.setProperty("--plyr-control-icon-size", PLYR_THEME.iconSize);
+    root.style.setProperty(
+      "--plyr-control-icon-size-large",
+      PLYR_THEME.iconSizeLarge || "24px"
+    );
+    root.style.setProperty("--plyr-control-spacing", "8px"); // REDUCED FROM 10px
+    root.style.setProperty("--plyr-control-radius", PLYR_THEME.borderRadius);
+
+    // CRITICAL: Apply control size and reduced range sizing
+    root.style.setProperty("--plyr-control-size", PLYR_THEME.controlSize);
+    root.style.setProperty("--plyr-range-track-height", "4px"); // REDUCED FROM 5px
+    root.style.setProperty("--plyr-range-thumb-height", "10px"); // REDUCED FROM 13px
+    root.style.setProperty("--plyr-range-thumb-width", "10px"); // NEW: explicit thumb width
+
+    root.style.setProperty(
+      "--plyr-range-fill-background",
+      PLYR_THEME.primaryColor
+    );
+    root.style.setProperty(
+      "--plyr-video-progress-buffered-background",
+      PLYR_THEME.bufferColor
+    );
+    root.style.setProperty(
+      "--plyr-range-track-background",
+      PLYR_THEME.sliderTrackColor
+    );
+    root.style.setProperty(
+      "--plyr-video-controls-background",
+      PLYR_THEME.controlBackground
+    );
+    root.style.setProperty(
+      "--plyr-badge-background",
+      PLYR_THEME.badgeBackground
+    );
+    root.style.setProperty(
+      "--plyr-badge-text-color",
+      PLYR_THEME.badgeTextColor
+    );
+    root.style.setProperty("--plyr-tab-focus-color", PLYR_THEME.focusColor);
+    root.style.setProperty("--plyr-font-family", PLYR_THEME.fontFamily);
+    root.style.setProperty("--plyr-font-size-small", PLYR_THEME.fontSizeSmall);
+    root.style.setProperty("--plyr-font-size-base", PLYR_THEME.fontSizeBase);
+    root.style.setProperty("--plyr-font-size-large", PLYR_THEME.fontSizeLarge);
+
+    // NEW: Additional control bar sizing
+    root.style.setProperty("--plyr-video-controls-height", "36px"); // NEW: explicit controls height
+    root.style.setProperty("--plyr-control-padding", "4px 6px"); // NEW: reduced control padding
+  }
+
+  // Fix Plyr icons with proper SVG definitions (secure DOM manipulation)
+  fixPlyrIcons() {
+    setTimeout(() => {
+      const container = document.querySelector(".plyr");
+      if (!container) return;
+
+      // Helper function to create SVG elements safely
+      const createSVGElement = (tag, attributes = {}) => {
+        const element = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          tag
+        );
+        Object.entries(attributes).forEach(([key, value]) => {
+          element.setAttribute(key, value);
+        });
+        return element;
+      };
+
+      // Fix play button (triangle) - clear all content and add single SVG
+      const playBtn = container.querySelector('[data-plyr="play"]');
+      if (playBtn) {
+        // Clear existing content
+        while (playBtn.firstChild) {
+          playBtn.removeChild(playBtn.firstChild);
+        }
+        const svg = createSVGElement("svg", {
+          viewBox: "0 0 24 24",
+          width: "18",
+          height: "18",
+        });
+        const polygon = createSVGElement("polygon", {
+          points: "5,2 19,12 5,22",
+          fill: "currentColor",
+        });
+        svg.appendChild(polygon);
+        playBtn.appendChild(svg);
+      }
+
+      // Fix large play button (triangle) - clear all content and add single SVG
+      const playLargeBtn = container.querySelector('[data-plyr="play-large"]');
+      if (playLargeBtn) {
+        while (playLargeBtn.firstChild) {
+          playLargeBtn.removeChild(playLargeBtn.firstChild);
+        }
+        const svg = createSVGElement("svg", {
+          viewBox: "0 0 24 24",
+          width: "28",
+          height: "28",
+        });
+        const polygon = createSVGElement("polygon", {
+          points: "8,5 19,12 8,19",
+          fill: "currentColor",
+        });
+        svg.appendChild(polygon);
+        playLargeBtn.appendChild(svg);
+      }
+
+      // Fix pause button - clear all content and add single SVG
+      const pauseBtn = container.querySelector('[data-plyr="pause"]');
+      if (pauseBtn) {
+        while (pauseBtn.firstChild) {
+          pauseBtn.removeChild(pauseBtn.firstChild);
+        }
+        const svg = createSVGElement("svg", {
+          viewBox: "0 0 24 24",
+          width: "18",
+          height: "18",
+        });
+        const rect1 = createSVGElement("rect", {
+          x: "6",
+          y: "4",
+          width: "4",
+          height: "16",
+          fill: "currentColor",
+        });
+        const rect2 = createSVGElement("rect", {
+          x: "14",
+          y: "4",
+          width: "4",
+          height: "16",
+          fill: "currentColor",
+        });
+        svg.appendChild(rect1);
+        svg.appendChild(rect2);
+        pauseBtn.appendChild(svg);
+      }
+
+      // Fix mute button (volume icon) - clear all content and add single SVG
+      const muteBtn = container.querySelector('[data-plyr="mute"]');
+      if (muteBtn) {
+        while (muteBtn.firstChild) {
+          muteBtn.removeChild(muteBtn.firstChild);
+        }
+        const svg = createSVGElement("svg", {
+          viewBox: "0 0 24 24",
+          width: "18",
+          height: "18",
+        });
+        const polygon = createSVGElement("polygon", {
+          points: "11,5 6,9 2,9 2,15 6,15 11,19",
+          fill: "currentColor",
+        });
+        const path1 = createSVGElement("path", {
+          d: "M19.07,4.93C20.98,6.84 22,9.35 22,12s-1.02,5.16-2.93,7.07l-1.41-1.41C19.59,15.73 20.5,13.95 20.5,12s-0.91-3.73-2.84-5.66L19.07,4.93z",
+          fill: "currentColor",
+        });
+        svg.appendChild(polygon);
+        svg.appendChild(path1);
+        muteBtn.appendChild(svg);
+      }
+
+      // Fix fullscreen button (single icon) - clear all content and add single SVG
+      const fullscreenBtn = container.querySelector('[data-plyr="fullscreen"]');
+      if (fullscreenBtn) {
+        while (fullscreenBtn.firstChild) {
+          fullscreenBtn.removeChild(fullscreenBtn.firstChild);
+        }
+        const svg = createSVGElement("svg", {
+          viewBox: "0 0 24 24",
+          width: "18",
+          height: "18",
+        });
+        const path = createSVGElement("path", {
+          d: "M7,14H5v5h5v-2H7V14z M5,10h2V7h3V5H5V10z M17,17h-3v2h5v-5h-2V17z M14,5v2h3v3h2V5H14z",
+          fill: "currentColor",
+        });
+        svg.appendChild(path);
+        fullscreenBtn.appendChild(svg);
+      }
+
+      // Also fix any duplicate controls that might exist
+      const allControls = container.querySelectorAll(".plyr__control");
+      allControls.forEach((control) => {
+        const svgs = control.querySelectorAll("svg");
+        if (svgs.length > 1) {
+          // Remove all but the first SVG
+          for (let i = 1; i < svgs.length; i++) {
+            svgs[i].remove();
+          }
+        }
+      });
+    }, 100);
+  }
+
   async initialize() {
     try {
+      // Check if there was a constructor error
+      if (this.error) {
+        this.handleInitializationError(new Error(this.error));
+        return;
+      }
+
       await this.startPlayer();
     } catch (error) {
       this.handleInitializationError(error);
+    }
+  }
+
+  // Handle initialization errors gracefully
+  handleInitializationError(error) {
+    console.error("Player initialization failed:", error);
+
+    // Show user-friendly error message
+    if (this.ui) {
+      this.ui.showError(`Failed to initialize player: ${error.message}`);
+      this.ui.hidePlyrLoadingOverlay();
+    } else {
+      // Fallback if UI is not available
+      const overlay = document.getElementById("plyr-loading-overlay");
+      if (overlay) {
+        // Clear existing content safely
+        overlay.textContent = "";
+
+        // Create error container
+        const errorContainer = document.createElement("div");
+        errorContainer.style.textAlign = "center";
+        errorContainer.style.color = "#fff";
+        errorContainer.style.padding = "20px";
+
+        // Create icon
+        const iconDiv = document.createElement("div");
+        iconDiv.textContent = "⚠️";
+        iconDiv.style.fontSize = "2em";
+        iconDiv.style.marginBottom = "10px";
+
+        // Create title
+        const titleDiv = document.createElement("div");
+        titleDiv.textContent = "Player Error";
+        titleDiv.style.fontSize = "1.2em";
+        titleDiv.style.marginBottom = "10px";
+
+        // Create message
+        const messageDiv = document.createElement("div");
+        messageDiv.textContent = error.message || "Unknown error occurred";
+        messageDiv.style.opacity = "0.8";
+
+        errorContainer.appendChild(iconDiv);
+        errorContainer.appendChild(titleDiv);
+        errorContainer.appendChild(messageDiv);
+
+        overlay.appendChild(errorContainer);
+        overlay.style.display = "flex";
+      }
     }
   }
 
@@ -1867,28 +2549,42 @@ class VideoPlayerController {
 
       this.ui.showStep("Video and subtitles are ready (or video only)");
 
-      // Set up video
-      this.ui.elements.video.src = videoSrc;
-      this.ui.elements.video.load();
+      // Set up video with error handling and resource optimization
+      try {
+        // Apply Chrome optimizations before loading
+        ChromeResourceManager.optimizeVideo(this.ui.elements.video);
+
+        this.ui.elements.video.src = videoSrc;
+        this.ui.elements.video.load();
+      } catch (videoError) {
+        console.error("Error setting video source:", videoError);
+        this.ui.showError(`Failed to load video: ${videoError.message}`);
+        throw videoError;
+      }
 
       // Initialize Plyr player if not already done
       if (!this.playerInitialized) {
-        this.plyrInstance = new Plyr(this.ui.elements.video, {
-          captions: { active: true, update: true, language: "en" },
-          controls: [
-            "play-large", // This shows the big play button in the center
-            "play",
-            "progress",
-            "current-time",
-            "mute",
-            "volume",
-            "captions",
-            "settings",
-            "fullscreen",
-          ],
-          pip: false,
-        });
-        this.playerInitialized = true;
+        try {
+          this.plyrInstance = new Plyr(this.ui.elements.video, PLYR_CONFIG);
+          this.playerInitialized = true;
+
+          // Fix Plyr icons after initialization
+          this.fixPlyrIcons();
+
+          // Add error handling for Plyr events
+          if (this.plyrInstance) {
+            this.plyrInstance.on("error", (event) => {
+              console.error("Plyr error:", event);
+              this.ui.showError("Video player error occurred.");
+            });
+          }
+        } catch (error) {
+          console.error("Failed to initialize Plyr:", error);
+          this.ui.showError(
+            `Failed to initialize video player: ${error.message}`
+          );
+          throw error;
+        }
 
         // === custom quality indicator to Plyr controls ===
         // Use requestAnimationFrame for better performance
@@ -1916,75 +2612,6 @@ class VideoPlayerController {
 
             // Use utility function to add before fullscreen
             addToPlyrControlsBar(qualityIndicator, {
-              before: '[data-plyr="fullscreen"]',
-            });
-          }
-          // === Add subtitles section button ===
-          const cachedControlsBar =
-            this.ui._getCachedElement(".plyr__controls");
-          if (
-            cachedControlsBar &&
-            !document.getElementById("plyr-subtitles-btn")
-          ) {
-            const subtitlesBtn = document.createElement("button");
-            subtitlesBtn.id = "plyr-subtitles-btn";
-            subtitlesBtn.className = "plyr__control plyr__subtitles-btn";
-            subtitlesBtn.type = "button";
-            subtitlesBtn.setAttribute("aria-label", "Subtitles");
-
-            // Use innerHTML for faster SVG creation
-            subtitlesBtn.innerHTML = `
-              <svg width="32" height="32" viewBox="0 0 32 32">
-                <g id="cc">
-                  <path fill="#ffffffff" d="M14,23H6a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H6a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"/>
-                  <path fill="#ffffffff" d="M28,23H20a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H20a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"/>
-                </g>
-              </svg>
-            `;
-            // Use CSS string for better performance
-            subtitlesBtn.style.cssText = `
-              margin: 0 8px;
-              background: none;
-              border: none;
-              cursor: pointer;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              padding: 2px 0px;
-              border-radius: 4px;
-              color: #fff;
-              transition: all 0.2s ease;
-            `;
-
-            // Use event delegation for better performance
-            let isHovered = false;
-            subtitlesBtn.addEventListener("mouseenter", () => {
-              if (!isHovered) {
-                isHovered = true;
-                subtitlesBtn.style.background = "#03a9f4";
-                subtitlesBtn.style.padding = "5px";
-              }
-            });
-            subtitlesBtn.addEventListener("mouseleave", () => {
-              if (isHovered) {
-                isHovered = false;
-                subtitlesBtn.style.background = "none";
-                subtitlesBtn.style.padding = "2px 0px";
-              }
-            });
-
-            // Optimize click handler with cached selector
-            subtitlesBtn.addEventListener("click", () => {
-              const selector = this.ui._getCachedElement(
-                "#subtitle-selector-container"
-              );
-              if (selector) {
-                const isVisible = selector.style.display !== "none";
-                selector.style.display = isVisible ? "none" : "";
-              }
-            });
-            // Use utility function to add before fullscreen button
-            addToPlyrControlsBar(subtitlesBtn, {
               before: '[data-plyr="fullscreen"]',
             });
           }
@@ -2048,66 +2675,101 @@ class VideoPlayerController {
 
       this.ui.setStatusMessage("");
     } catch (error) {
-      throw new Error(`Failed to load video or subtitles: ${error.message}`);
+      console.error("Failed to load video or subtitles:", error);
+      this.ui.showError(`Failed to load video or subtitles: ${error.message}`);
+      return false;
     }
   }
 
   // Handle status updates from the poller
   handleStatusUpdate(data, errorMsg) {
-    if (data) {
-      // Check if file was deleted externally
-      if (data.fileDeleted) {
-        if (CONFIG.DEBUG_MODE)
-          console.log("File was deleted externally, cleaning up localStorage");
-        this.clearLocalStorageData();
-        this.ui.showError(
-          "Video file was deleted. Please reload with a new torrent."
-        );
-        this.statusPoller.stop();
-        return;
+    try {
+      if (data) {
+        // Check if file was deleted externally
+        if (data.fileDeleted) {
+          if (CONFIG.DEBUG_MODE)
+            console.log(
+              "File was deleted externally, cleaning up localStorage"
+            );
+          this.clearLocalStorageData();
+          this.ui.showError(
+            "Video file was deleted. Please reload with a new torrent."
+          );
+          this.statusPoller.stop();
+          return;
+        }
+
+        // Check if download is starting from zero (fresh download)
+        if (
+          data.status === "downloading" &&
+          data.progress === 0 &&
+          data.downloaded === 0 &&
+          !this.hasSeenDownloadProgress
+        ) {
+          this.clearLocalStorageData();
+          this.hasSeenDownloadProgress = true;
+        } else if (data.downloaded > 0) {
+          // Mark that we've seen some progress
+          this.hasSeenDownloadProgress = true;
+        }
+
+        this.ui.updateStatusBar(data);
+
+        // Start player when downloading begins - with error handling
+        if (
+          (data.status === "downloading" || data.status === "done") &&
+          !this.playerStarted
+        ) {
+          this.playerStarted = true;
+          this.startPlayer().catch((error) => {
+            console.error("Error starting player:", error);
+            this.ui.showError(`Failed to start player: ${error.message}`);
+          });
+        }
+
+        // Set ready flag for fast start
+        if (data.downloaded && data.downloaded > CONFIG.READY_THRESHOLD) {
+          try {
+            localStorage.setItem(this.playerReadyKey, "1");
+            this.ui.hideLoading();
+          } catch (storageError) {
+            console.warn(
+              "Failed to set localStorage ready flag:",
+              storageError
+            );
+            this.ui.hideLoading(); // Still hide loading even if storage fails
+          }
+        }
+
+        this.ui.setStatusMessage("");
+      } else {
+        this.ui.updateStatusBar();
+        this.ui.setStatusMessage(errorMsg || "");
       }
-
-      // Check if download is starting from zero (fresh download)
-      if (
-        data.status === "downloading" &&
-        data.progress === 0 &&
-        data.downloaded === 0 &&
-        !this.hasSeenDownloadProgress
-      ) {
-        this.clearLocalStorageData();
-        this.hasSeenDownloadProgress = true;
-      } else if (data.downloaded > 0) {
-        // Mark that we've seen some progress
-        this.hasSeenDownloadProgress = true;
+    } catch (error) {
+      console.error("Error in handleStatusUpdate:", error);
+      if (CONFIG.DEBUG_MODE) {
+        console.error("Stack trace:", error.stack);
+        console.error("Data:", data);
+        console.error("Error message:", errorMsg);
       }
-
-      this.ui.updateStatusBar(data);
-
-      // Start player when downloading begins
-      if (
-        (data.status === "downloading" || data.status === "done") &&
-        !this.playerStarted
-      ) {
-        this.playerStarted = true;
-        this.startPlayer();
-      }
-
-      // Set ready flag for fast start
-      if (data.downloaded && data.downloaded > CONFIG.READY_THRESHOLD) {
-        localStorage.setItem(this.playerReadyKey, "1");
-        this.ui.hideLoading();
-      }
-
-      this.ui.setStatusMessage("");
-    } else {
-      this.ui.updateStatusBar();
-      this.ui.setStatusMessage(errorMsg || "");
+      // Prevent cascading errors
+      this.ui.showError(
+        "An error occurred during status update. Please refresh."
+      );
     }
   }
 
   // Handle video error event and trigger retry logic
   handleVideoError() {
     if (CONFIG.DEBUG_MODE) console.log("Video error event triggered");
+
+    // Check if error is due to resource exhaustion
+    if (ChromeResourceManager.monitorMemory()) {
+      console.warn("Video error may be due to high memory usage");
+      ChromeResourceManager.forceGarbageCollection();
+    }
+
     this.ui.showError("Video loading... (will retry automatically)");
     this.ui.showRetryButton();
     this.ui.showStep("Video error event - starting retry");
@@ -2175,53 +2837,67 @@ class VideoPlayerController {
 
   // Handle video loadedmetadata event
   handleVideoLoadedMetadata() {
-    const video = this.ui.elements.video;
+    try {
+      const video = this.ui.elements.video;
 
-    // Store original duration on first successful load
-    if (
-      !this.originalDuration &&
-      isFinite(video.duration) &&
-      video.duration > 0
-    ) {
-      this.originalDuration = video.duration;
-      if (CONFIG.DEBUG_MODE)
-        console.log("[AUDIO] Stored original duration:", this.originalDuration);
-    }
-
-    // Fallback: if duration is null, NaN, or Infinity after loadedmetadata, use originalDuration after short timeout
-    setTimeout(() => {
-      if (!isFinite(video.duration) || video.duration == null) {
-        try {
-          const fallbackDuration =
-            this.originalDuration || this.previousDuration;
-          if (isFinite(fallbackDuration)) {
-            Object.defineProperty(video, "duration", {
-              value: fallbackDuration,
-            });
-            video.dispatchEvent(new Event("durationchange"));
-            if (
-              this.plyrInstance &&
-              typeof this.plyrInstance.update === "function"
-            ) {
-              this.plyrInstance.update();
-            }
-            if (CONFIG.DEBUG_MODE)
-              console.log(
-                "[AUDIO] Fallback: set duration to:",
-                fallbackDuration,
-                "(original:",
-                this.originalDuration,
-                "previous:",
-                this.previousDuration,
-                ")"
-              );
-          }
-        } catch (e) {
-          if (CONFIG.DEBUG_MODE)
-            console.warn("Failed to set fallback duration for Plyr:", e);
-        }
+      // Store original duration on first successful load
+      if (
+        !this.originalDuration &&
+        isFinite(video.duration) &&
+        video.duration > 0
+      ) {
+        this.originalDuration = video.duration;
+        if (CONFIG.DEBUG_MODE)
+          console.log(
+            "[AUDIO] Stored original duration:",
+            this.originalDuration
+          );
       }
-    }, 500);
+
+      // Fallback: if duration is null, NaN, or Infinity after loadedmetadata, use originalDuration after short timeout
+      setTimeout(() => {
+        try {
+          if (!isFinite(video.duration) || video.duration == null) {
+            try {
+              const fallbackDuration =
+                this.originalDuration || this.previousDuration;
+              if (isFinite(fallbackDuration)) {
+                Object.defineProperty(video, "duration", {
+                  value: fallbackDuration,
+                });
+                video.dispatchEvent(new Event("durationchange"));
+                if (
+                  this.plyrInstance &&
+                  typeof this.plyrInstance.update === "function"
+                ) {
+                  this.plyrInstance.update();
+                }
+                if (CONFIG.DEBUG_MODE)
+                  console.log(
+                    "[AUDIO] Fallback: set duration to:",
+                    fallbackDuration,
+                    "(original:",
+                    this.originalDuration,
+                    "previous:",
+                    this.previousDuration,
+                    ")"
+                  );
+              }
+            } catch (e) {
+              if (CONFIG.DEBUG_MODE)
+                console.warn("Failed to set fallback duration for Plyr:", e);
+            }
+          }
+        } catch (durationError) {
+          console.warn("Error handling duration fallback:", durationError);
+        }
+      }, 500);
+    } catch (error) {
+      console.error("Error in handleVideoLoadedMetadata:", error);
+      if (CONFIG.DEBUG_MODE) {
+        console.error("Metadata error stack:", error.stack);
+      }
+    }
     this.ui.updatePlyrLoadingText("Loading video data...");
 
     // Restore playback position on loadedmetadata
@@ -2334,6 +3010,12 @@ class VideoPlayerController {
 
   // Cleanup resources and notify server when leaving page
   cleanup() {
+    // Clear memory monitoring interval
+    if (this.memoryMonitorInterval) {
+      clearInterval(this.memoryMonitorInterval);
+      this.memoryMonitorInterval = null;
+    }
+
     if (!CONFIG.MANUAL_CLEANUP) {
       if (CONFIG.DEBUG_MODE)
         console.log("Manual cleanup is disabled - skipping immediate cleanup");
@@ -2852,7 +3534,13 @@ class AudioManager {
     micIcon.setAttribute("width", "18");
     micIcon.setAttribute("height", "18");
     micIcon.setAttribute("viewBox", "0 0 24 24");
-    micIcon.innerHTML = `<path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.93V21h2v-2.07c3.39-.5 6-3.4 6-6.93h-2z" fill="currentColor"/>`;
+    const micPath = document.createElementNS(svgNS, "path");
+    micPath.setAttribute(
+      "d",
+      "M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.93V21h2v-2.07c3.39-.5 6-3.4 6-6.93h-2z"
+    );
+    micPath.setAttribute("fill", "currentColor");
+    micIcon.appendChild(micPath);
     switchButton.appendChild(micIcon);
 
     // Audio selector container styled like subtitles
@@ -3336,3 +4024,15 @@ class AudioManager {
     }
   }
 }
+
+// ES6 module exports
+export {
+  VideoPlayerController,
+  UIController,
+  SubtitlesManager,
+  AudioManager,
+  RetryController,
+  StatusPoller,
+  ResourceLoader,
+  FullscreenController,
+};
