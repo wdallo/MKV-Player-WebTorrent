@@ -116,7 +116,9 @@
       />
       <script>
         document.addEventListener("DOMContentLoaded", () => {
-          const magnetUrl = "<%= magnet %>";
+          const magnetUrl = decodeURIComponent(
+            "<%- encodeURIComponent(magnet) %>"
+          );
           const embedInput = document.getElementById("embed-code");
           embedInput.value = `<iframe src="${
             window.location.origin
@@ -132,17 +134,130 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
-    <script src="../libs/player.js"></script>
+    <script type="module">
+      // Import the VideoPlayerController class
+      import { VideoPlayerController } from "../libs/player.js";
+
+      // Initialize the application with error handling
+      document.addEventListener("DOMContentLoaded", async () => {
+        try {
+          const magnetUrl = decodeURIComponent(
+            "<%- encodeURIComponent(magnet) %>"
+          );
+
+          if (!magnetUrl) {
+            console.error("No magnet URL provided");
+            return;
+          }
+
+          console.log("Initializing player with magnet:", magnetUrl);
+
+          const player = new VideoPlayerController(magnetUrl);
+
+          // Make player globally accessible for context menu and debugging
+          window.player = player;
+
+          // Initialize with error handling
+          await player.initialize();
+
+          console.log("✅ Player initialized successfully");
+        } catch (error) {
+          console.error("❌ Failed to initialize player:", error);
+
+          // Show error in overlay if available
+          const overlay = document.getElementById("plyr-loading-overlay");
+          if (overlay) {
+            // Clear existing content safely
+            overlay.textContent = "";
+
+            // Create error container
+            const errorContainer = document.createElement("div");
+            errorContainer.style.textAlign = "center";
+            errorContainer.style.color = "#fff";
+            errorContainer.style.padding = "20px";
+
+            // Create icon
+            const iconDiv = document.createElement("div");
+            iconDiv.textContent = "⚠️";
+            iconDiv.style.fontSize = "2em";
+            iconDiv.style.marginBottom = "10px";
+
+            // Create title
+            const titleDiv = document.createElement("div");
+            titleDiv.textContent = "Player Error";
+            titleDiv.style.fontSize = "1.2em";
+            titleDiv.style.marginBottom = "10px";
+
+            // Create message
+            const messageDiv = document.createElement("div");
+            messageDiv.textContent = error.message || "Unknown error occurred";
+            messageDiv.style.opacity = "0.8";
+
+            // Create retry button
+            const retryButton = document.createElement("button");
+            retryButton.textContent = "Retry";
+            retryButton.style.marginTop = "15px";
+            retryButton.style.padding = "8px 16px";
+            retryButton.style.background = "#007bff";
+            retryButton.style.color = "white";
+            retryButton.style.border = "none";
+            retryButton.style.borderRadius = "4px";
+            retryButton.style.cursor = "pointer";
+            retryButton.onclick = () => location.reload();
+
+            // Assemble the error display
+            errorContainer.appendChild(iconDiv);
+            errorContainer.appendChild(titleDiv);
+            errorContainer.appendChild(messageDiv);
+            errorContainer.appendChild(retryButton);
+            overlay.appendChild(errorContainer);
+          }
+        }
+      });
+    </script>
+
+    <!-- Fallback error handler for ES6 module loading issues -->
     <script>
-      // Initialize the application
-      document.addEventListener("DOMContentLoaded", () => {
-        const magnetUrl = "<%= magnet %>";
-        const player = new VideoPlayerController(magnetUrl);
+      window.addEventListener("error", function (e) {
+        if (e.message && e.message.includes("module")) {
+          console.error("ES6 Module Loading Error:", e);
+          const overlay = document.getElementById("plyr-loading-overlay");
+          if (overlay) {
+            // Clear existing content safely
+            overlay.textContent = "";
 
-        // Make player globally accessible for context menu and debugging
-        window.player = player;
+            // Create error container
+            const errorContainer = document.createElement("div");
+            errorContainer.style.textAlign = "center";
+            errorContainer.style.color = "#fff";
+            errorContainer.style.padding = "20px";
 
-        player.initialize();
+            // Create icon
+            const iconDiv = document.createElement("div");
+            iconDiv.textContent = "⚠️";
+            iconDiv.style.fontSize = "3em";
+            iconDiv.style.marginBottom = "10px";
+
+            // Create title
+            const titleDiv = document.createElement("div");
+            titleDiv.textContent = "Module Loading Error";
+            titleDiv.style.fontSize = "1.2em";
+            titleDiv.style.marginBottom = "10px";
+
+            // Create description
+            const descDiv = document.createElement("div");
+            descDiv.textContent =
+              "Please refresh the page or try a different browser that supports ES6 modules.";
+            descDiv.style.fontSize = "0.9em";
+            descDiv.style.opacity = "0.8";
+
+            // Assemble the error display
+            errorContainer.appendChild(iconDiv);
+            errorContainer.appendChild(titleDiv);
+            errorContainer.appendChild(descDiv);
+            overlay.appendChild(errorContainer);
+          }
+        }
       });
     </script>
   </body>

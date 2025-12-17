@@ -1,12 +1,26 @@
 * {
   box-sizing: border-box;
+  /* Improve performance with will-change and contain */
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: #181818;
   color: #fff;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: "Segoe UI", "Arial", sans-serif;
   margin: 0;
   padding: 0;
+  /* Optimize rendering performance */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Improve scrolling performance */
+  -webkit-overflow-scrolling: touch;
+  /* Prevent layout shifts */
+  min-height: 100vh;
 }
 
 .retry-button {
@@ -18,21 +32,48 @@ body {
   border-radius: 5px;
   cursor: pointer;
   margin: 10px 0;
+  /* Performance optimizations */
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  will-change: background-color;
+}
+
+.retry-button:hover {
+  background: #1976d2;
+  transform: translateY(-1px);
+}
+
+.retry-button:active {
+  transform: translateY(0);
+}
+
+.retry-button:focus {
+  outline: 2px solid #90caf9;
+  outline-offset: 2px;
 }
 .video-container-main {
   margin: 0 auto;
-  max-width: 850px;
+  max-width: min(850px, 95vw);
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 12px #0008;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
   background: #000;
+  /* Performance optimizations */
+  will-change: transform;
+  contain: layout style;
+  /* Responsive design improvements */
+  width: 100%;
 }
+
 .video-container-tag {
   position: relative;
   width: 100%;
   height: 100%;
   aspect-ratio: 16/9;
+  /* GPU acceleration for better performance */
+  transform: translateZ(0);
+  /* Prevent content shifts */
+  contain: layout;
 }
 .video-watermark {
   position: absolute;
@@ -54,6 +95,46 @@ body {
   z-index: 2147483647;
   /* You can adjust font-size and position for fullscreen */
 }
+
+/* Subtitle/Caption sizing for fullscreen */
+.plyr:fullscreen .plyr__captions,
+.plyr--fullscreen-fallback .plyr__captions {
+  font-size: 28px !important;
+  bottom: 80px !important;
+}
+
+/* Subtitle container sizing for SubtitlesOctopus */
+.video-container-tag:fullscreen .subtitles-octopus,
+.video-container-tag:-webkit-full-screen .subtitles-octopus {
+  font-size: 28px !important;
+  bottom: 80px !important;
+}
+
+/* Ensure subtitles scale with video size in fullscreen */
+@media (min-width: 1920px) {
+  .plyr:fullscreen .plyr__captions,
+  .plyr--fullscreen-fallback .plyr__captions {
+    font-size: 32px !important;
+  }
+
+  .video-container-tag:fullscreen .subtitles-octopus,
+  .video-container-tag:-webkit-full-screen .subtitles-octopus {
+    font-size: 32px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .plyr:fullscreen .plyr__captions,
+  .plyr--fullscreen-fallback .plyr__captions {
+    font-size: 24px !important;
+  }
+
+  .video-container-tag:fullscreen .subtitles-octopus,
+  .video-container-tag:-webkit-full-screen .subtitles-octopus {
+    font-size: 24px !important;
+  }
+}
+
 .video-player-tag {
   background: #000;
   aspect-ratio: 16/9;
@@ -493,21 +574,63 @@ h1 {
   border-radius: 8px;
   margin-top: 16px;
 }
-/* For Webkit browsers (Chrome, Edge, Safari) */
-#subtitle-selector-container::-webkit-scrollbar {
+/* Custom Scrollbar Styles for all player menus */
+#subtitle-selector-container::-webkit-scrollbar,
+#audio-selector-container::-webkit-scrollbar,
+.plyr__menu__container::-webkit-scrollbar,
+.plyr__menu::-webkit-scrollbar,
+.video-context-menu::-webkit-scrollbar {
   width: 8px;
-  background: #222;
-  border-radius: 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
 }
 
-#subtitle-selector-container::-webkit-scrollbar-thumb {
+#subtitle-selector-container::-webkit-scrollbar-thumb,
+#audio-selector-container::-webkit-scrollbar-thumb,
+.plyr__menu__container::-webkit-scrollbar-thumb,
+.plyr__menu::-webkit-scrollbar-thumb,
+.video-context-menu::-webkit-scrollbar-thumb {
   background: #444;
-  border-radius: 8px;
+  border-radius: 4px;
+  border: 1px solid #333;
 }
 
-#subtitle-selector-container::-webkit-scrollbar-thumb:hover {
+#subtitle-selector-container::-webkit-scrollbar-thumb:hover,
+#audio-selector-container::-webkit-scrollbar-thumb:hover,
+.plyr__menu__container::-webkit-scrollbar-thumb:hover,
+.plyr__menu::-webkit-scrollbar-thumb:hover,
+.video-context-menu::-webkit-scrollbar-thumb:hover {
   background: #666;
 }
+
+/* Firefox scrollbar */
+#subtitle-selector-container,
+#audio-selector-container,
+.plyr__menu__container,
+.plyr__menu,
+.video-context-menu {
+  scrollbar-width: thin;
+  scrollbar-color: #444 #1a1a1a;
+}
+
+/* Ensure all Plyr controls use theme colors */
+.plyr__control--pressed,
+.plyr__control[aria-expanded="true"] {
+  color: var(--plyr-color-main) !important;
+}
+
+.plyr__control--pressed svg,
+.plyr__control[aria-expanded="true"] svg {
+  fill: var(--plyr-color-main) !important;
+}
+
+/* Captions button when active */
+.plyr__control[data-plyr="captions"].plyr__control--pressed,
+.plyr__control[data-plyr="captions"][aria-expanded="true"] {
+  color: var(--plyr-color-main) !important;
+  background: transparent !important;
+}
+
 .sysinfo-table {
   width: 100%;
   border-collapse: collapse;
@@ -647,4 +770,116 @@ h2 {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Force smaller Plyr controls and progress bar */
+.plyr__controls {
+  font-size: 13px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  padding: 4px 8px !important;
+}
+
+.plyr__control {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 4px !important;
+}
+
+.plyr__progress {
+  height: 4px !important;
+  min-height: 4px !important;
+  margin: 0 !important;
+  max-width: 98% !important;
+  flex: none !important;
+}
+
+.plyr__progress input[type="range"] {
+  height: 4px !important;
+  min-height: 4px !important;
+  max-width: 100% !important;
+}
+
+.plyr__volume input[type="range"] {
+  height: 4px !important;
+  width: 60px !important;
+}
+
+/* Progress bar thumb */
+.plyr__progress input[type="range"]::-webkit-slider-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+.plyr__progress input[type="range"]::-moz-range-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+/* Volume thumb */
+.plyr__volume input[type="range"]::-webkit-slider-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+.plyr__volume input[type="range"]::-moz-range-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+/* Time displays */
+.plyr__time {
+  font-size: 12px !important;
+  min-width: 50px !important;
+}
+
+/* Custom controls sizing */
+#plyr-quality-indicator,
+#plyr-subtitles-btn,
+#audio-switch-btn {
+  font-size: 12px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 4px 6px !important;
+}
+
+#plyr-subtitles-btn svg,
+#audio-switch-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* Fix icon centering on hover */
+.plyr__control {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.plyr__control svg {
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+/* Ensure large play button centers properly */
+.plyr__control--overlaid {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 64px !important;
+  height: 64px !important;
+}
+
+.plyr__control--overlaid svg {
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 !important;
+}
+
+/* Fix subtitle and audio button centering */
+#plyr-subtitles-btn,
+#audio-switch-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }

@@ -70,11 +70,16 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
-    <script src="../libs/player.js"></script>
-    <script>
+    <script type="module">
+      // Import required functions and classes
+      import { isValidMagnet } from "../utils/magnetValidator.js";
+      import { VideoPlayerController } from "../libs/player.js";
+
       document.addEventListener("DOMContentLoaded", () => {
         const urlParams = new URLSearchParams(window.location.search);
-        const magnetUrl = urlParams.get("url") || "<%= url %>";
+        const magnetUrl =
+          urlParams.get("url") ||
+          decodeURIComponent("<%- encodeURIComponent(url) %>");
 
         if (!magnetUrl || !isValidMagnet(magnetUrl)) {
           const loadingText =
@@ -130,6 +135,7 @@
 
           return;
         }
+
         const player = new VideoPlayerController(magnetUrl);
         window.player = player;
         player.initialize();
@@ -137,6 +143,51 @@
 
       const statusDetails = document.querySelector(".status-details");
       console.log(statusDetails);
+    </script>
+
+    <!-- Fallback error handler for ES6 module loading issues -->
+    <script>
+      window.addEventListener("error", function (e) {
+        if (e.message && e.message.includes("module")) {
+          console.error("ES6 Module Loading Error:", e);
+          const overlay = document.getElementById("plyr-loading-overlay");
+          if (overlay) {
+            // Clear existing content safely
+            overlay.textContent = "";
+
+            // Create error container
+            const errorContainer = document.createElement("div");
+            errorContainer.style.textAlign = "center";
+            errorContainer.style.color = "#fff";
+            errorContainer.style.padding = "20px";
+
+            // Create icon
+            const iconDiv = document.createElement("div");
+            iconDiv.textContent = "⚠️";
+            iconDiv.style.fontSize = "3em";
+            iconDiv.style.marginBottom = "10px";
+
+            // Create title
+            const titleDiv = document.createElement("div");
+            titleDiv.textContent = "Module Loading Error";
+            titleDiv.style.fontSize = "1.2em";
+            titleDiv.style.marginBottom = "10px";
+
+            // Create description
+            const descDiv = document.createElement("div");
+            descDiv.textContent =
+              "Please refresh the page or try a different browser that supports ES6 modules.";
+            descDiv.style.fontSize = "0.9em";
+            descDiv.style.opacity = "0.8";
+
+            // Assemble the error display
+            errorContainer.appendChild(iconDiv);
+            errorContainer.appendChild(titleDiv);
+            errorContainer.appendChild(descDiv);
+            overlay.appendChild(errorContainer);
+          }
+        }
+      });
     </script>
   </body>
 </html>

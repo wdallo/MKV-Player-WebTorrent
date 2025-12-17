@@ -528,21 +528,45 @@ canvas,
   border-radius: 8px;
   margin-top: 16px;
 }
-/* For Webkit browsers (Chrome, Edge, Safari) */
-#subtitle-selector-container::-webkit-scrollbar {
+/* Custom Scrollbar Styles for all player menus */
+#subtitle-selector-container::-webkit-scrollbar,
+#audio-selector-container::-webkit-scrollbar,
+.plyr__menu__container::-webkit-scrollbar,
+.plyr__menu::-webkit-scrollbar,
+.video-context-menu::-webkit-scrollbar {
   width: 8px;
-  background: #222;
-  border-radius: 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
 }
 
-#subtitle-selector-container::-webkit-scrollbar-thumb {
+#subtitle-selector-container::-webkit-scrollbar-thumb,
+#audio-selector-container::-webkit-scrollbar-thumb,
+.plyr__menu__container::-webkit-scrollbar-thumb,
+.plyr__menu::-webkit-scrollbar-thumb,
+.video-context-menu::-webkit-scrollbar-thumb {
   background: #444;
-  border-radius: 8px;
+  border-radius: 4px;
+  border: 1px solid #333;
 }
 
-#subtitle-selector-container::-webkit-scrollbar-thumb:hover {
+#subtitle-selector-container::-webkit-scrollbar-thumb:hover,
+#audio-selector-container::-webkit-scrollbar-thumb:hover,
+.plyr__menu__container::-webkit-scrollbar-thumb:hover,
+.plyr__menu::-webkit-scrollbar-thumb:hover,
+.video-context-menu::-webkit-scrollbar-thumb:hover {
   background: #666;
 }
+
+/* Firefox scrollbar */
+#subtitle-selector-container,
+#audio-selector-container,
+.plyr__menu__container,
+.plyr__menu,
+.video-context-menu {
+  scrollbar-width: thin;
+  scrollbar-color: #444 #1a1a1a;
+}
+
 .sysinfo-table {
   width: 100%;
   border-collapse: collapse;
@@ -682,4 +706,116 @@ h2 {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Force smaller Plyr controls and progress bar */
+.plyr__controls {
+  font-size: 13px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  padding: 4px 8px !important;
+}
+
+.plyr__control {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 4px !important;
+}
+
+.plyr__progress {
+  height: 4px !important;
+  min-height: 4px !important;
+  margin: 0 !important;
+  max-width: 98% !important;
+  flex: none !important;
+}
+
+.plyr__progress input[type="range"] {
+  height: 4px !important;
+  min-height: 4px !important;
+  max-width: 100% !important;
+}
+
+.plyr__volume input[type="range"] {
+  height: 4px !important;
+  width: 60px !important;
+}
+
+/* Progress bar thumb */
+.plyr__progress input[type="range"]::-webkit-slider-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+.plyr__progress input[type="range"]::-moz-range-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+/* Volume thumb */
+.plyr__volume input[type="range"]::-webkit-slider-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+.plyr__volume input[type="range"]::-moz-range-thumb {
+  height: 10px !important;
+  width: 10px !important;
+}
+
+/* Time displays */
+.plyr__time {
+  font-size: 12px !important;
+  min-width: 50px !important;
+}
+
+/* Custom controls sizing */
+#plyr-quality-indicator,
+#plyr-subtitles-btn,
+#audio-switch-btn {
+  font-size: 12px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 4px 6px !important;
+}
+
+#plyr-subtitles-btn svg,
+#audio-switch-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* Fix icon centering on hover */
+.plyr__control {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.plyr__control svg {
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+/* Ensure large play button centers properly */
+.plyr__control--overlaid {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 64px !important;
+  height: 64px !important;
+}
+
+.plyr__control--overlaid svg {
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 !important;
+}
+
+/* Fix subtitle and audio button centering */
+#plyr-subtitles-btn,
+#audio-switch-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }

@@ -62,19 +62,39 @@
 - **Live System Monitoring**: Real-time Node.js resource stats at `/sysinfo`
 - **Comprehensive Logging**: Detailed debug information and error tracking
 - **Centralized Configuration**: Modular config system in `configs/all.config.js`
-- **Utility Functions**: Reusable utilities in `utils/` folder (magnet validation, etc.)
+- **Utility Functions**: Reusable utilities in `utils/` folder (magnet validation, security, etc.)
 - **API Endpoints**: RESTful API for status, subtitles, and video streaming
 - **Modular Architecture**: Clean separation of concerns with dedicated folders
+- **ES6 Modules**: Full modern JavaScript module support with proper imports/exports
+
+### 🔒 **Security & Performance**
+
+- **Smart Rate Limiting**: Dynamic request limits optimized for streaming applications
+- **Content Security Policy**: Helmet-powered security headers with CDN whitelist support
+- **XSS Protection**: All innerHTML usage replaced with secure DOM manipulation
+- **Input Sanitization**: Comprehensive validation for magnet URLs and file paths
+- **Request Monitoring**: Security logging and suspicious activity detection
+- **Streaming-Optimized Limits**: Different rate limits for media vs. page endpoints
 
 ## 🚀 Recent Improvements
 
-### Architecture Improvements (v3.0)
+### Security & Module Enhancements (v4.0)
+
+- **Security Framework**: Complete security middleware with Helmet integration
+- **Smart Rate Limiting**: Streaming-optimized rate limits with endpoint-specific rules
+- **XSS Prevention**: All innerHTML usage replaced with secure DOM manipulation methods
+- **Content Security Policy**: Configurable CSP with trusted CDN whitelist support
+- **ES6 Module Compatibility**: Resolved all browser import/export issues with proper module declarations
+- **Input Validation**: Enhanced magnet URL validation and path traversal protection
+
+### Architecture Improvements (v3.0-4.0)
 
 - **Centralized Configuration**: All settings moved to `configs/all.config.js` with named exports
-- **Utility Functions**: New `utils/` folder with reusable components like magnet validation
+- **Security Utilities**: New `utils/security.js` with comprehensive security middleware
+- **Magnet Validation**: Dedicated `utils/magnetValidator.js` for enhanced URL validation
 - **Modular Design**: Better separation of concerns with dedicated folders for configs and utilities
-- **ES6 Modules**: Full migration to modern JavaScript import/export syntax
-- **Code Organization**: Improved project structure for better maintainability
+- **ES6 Modules**: Full migration to modern JavaScript import/export syntax with browser compatibility
+- **Code Organization**: Improved project structure for better maintainability and security
 
 ### Performance Optimizations (v2.0-3.0)
 
@@ -129,7 +149,8 @@ MKV-Player-WebTorrent/
 │   └── torrentService.js        # WebTorrent management & lifecycle
 │
 ├── 📂 utils/                     # Utility functions & helpers
-│   └── magnetValidator.js       # Magnet link validation utility
+│   ├── magnetValidator.js       # Enhanced magnet link validation utility
+│   └── security.js              # Security middleware & utilities (rate limiting, CSP, etc.)
 │
 ├── 📂 libs/                      # Frontend assets & libraries
 │   ├── player.js                # Main player application logic
@@ -158,14 +179,15 @@ MKV-Player-WebTorrent/
 
 ### Technology Stack
 
-| Component            | Technology        | Purpose                                  |
-| -------------------- | ----------------- | ---------------------------------------- |
-| **Backend**          | Node.js + Express | HTTP server & API endpoints              |
-| **Streaming**        | WebTorrent        | P2P video streaming                      |
-| **Video Processing** | FFmpeg            | Subtitle extraction & video analysis     |
-| **Frontend**         | Vanilla JS + EJS  | Responsive UI without framework overhead |
-| **Video Player**     | Plyr              | Modern HTML5 video player                |
-| **Subtitles**        | SubtitlesOctopus  | Advanced ASS/SSA subtitle rendering      |
+| Component            | Technology                  | Purpose                                |
+| -------------------- | --------------------------- | -------------------------------------- |
+| **Backend**          | Node.js + Express           | HTTP server & API endpoints            |
+| **Security**         | Helmet + express-rate-limit | Security headers & smart rate limiting |
+| **Streaming**        | WebTorrent                  | P2P video streaming                    |
+| **Video Processing** | FFmpeg                      | Subtitle extraction & video analysis   |
+| **Frontend**         | Vanilla JS + EJS            | Responsive UI with ES6 modules         |
+| **Video Player**     | Plyr                        | Modern HTML5 video player              |
+| **Subtitles**        | SubtitlesOctopus            | Advanced ASS/SSA subtitle rendering    |
 
 ## 🚀 Quick Start
 
@@ -190,6 +212,14 @@ MKV-Player-WebTorrent/
    ```bash
    npm install
    ```
+
+   **Key Dependencies Installed:**
+
+   - `express-rate-limit` - Smart rate limiting for streaming applications
+   - `helmet` - Security headers and content security policy
+   - `webtorrent` - P2P streaming technology
+   - `ffmpeg-static` - Video processing and subtitle extraction
+   - `plyr` - Modern video player interface
 
 3. **Start the server**
 
@@ -348,11 +378,45 @@ const maxRetries = PLAYER_CONFIG.MAX_RETRIES;
 const batchSize = PERF_CONFIG.PIECE_SELECTION_BATCH_SIZE;
 ```
 
+### Security Configuration
+
+The application includes comprehensive security middleware configured in `utils/security.js`:
+
+```javascript
+// Smart Rate Limiting (streaming-optimized)
+export const rateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: async (req) => {
+    // Different limits based on endpoint
+    if (req.url.includes("/video") || req.url.includes("/audio")) {
+      return 10000; // High limit for media streaming
+    }
+    if (req.url.includes("/subtitles") || req.url.includes("/status")) {
+      return 5000; // High limit for polling endpoints
+    }
+    return 500; // Default limit
+  },
+  skip: (req) => req.hostname === "localhost", // Skip localhost
+});
+
+// Security Headers
+export const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      connectSrc: ["'self'", "ws:", "wss:", "https://cdn.jsdelivr.net"],
+      // ... other security directives
+    },
+  },
+});
+```
+
 ### Benefits
 
 - **Centralized Management**: All settings in one location
 - **Named Exports**: Easy to import specific configs
-- **Type Safety**: Clear configuration structure
+- **Security Framework**: Built-in protection against common web vulnerabilities
+- **Streaming Optimized**: Rate limits designed for media applications
 - **Easy Customization**: Modify settings without touching core logic
 
 ### Environment Variables
@@ -568,6 +632,36 @@ Access the system monitoring dashboard at `/sysinfo` to view:
 - Ensure only one SubtitlesOctopus instance per video
 - Check that required fonts are loaded correctly
 - Clear browser cache and localStorage
+
+#### ES6 Module Import Errors
+
+**Symptoms**: "Cannot use import statement outside a module" errors
+**Solutions**:
+
+- Ensure all script tags have `type="module"` attribute
+- Check that all JavaScript files use proper ES6 import/export syntax
+- Verify browser supports ES6 modules (Chrome 61+, Firefox 60+, Safari 10.1+)
+- Clear browser cache and refresh page
+
+#### Security Policy Violations
+
+**Symptoms**: Content Security Policy (CSP) blocking resources
+**Solutions**:
+
+- Check that trusted domains are whitelisted in `utils/security.js`
+- Verify external CDNs are included in CSP directives
+- Ensure local resources are served from same origin
+- Review browser console for specific CSP violation details
+
+#### Rate Limiting Issues
+
+**Symptoms**: "Too Many Requests" (429) errors during streaming
+**Solutions**:
+
+- Check if running on localhost (should automatically skip rate limits)
+- Verify endpoint-specific rate limits in `utils/security.js`
+- Ensure streaming endpoints have appropriate high limits
+- Consider adjusting rate limit window and thresholds for your use case
 
 ### Error Codes
 
