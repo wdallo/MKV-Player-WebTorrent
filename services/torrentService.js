@@ -11,6 +11,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
 
+// Constants
+const AUTO_DELETE_DELAY = 72 * 60 * 60 * 1000; // 72 hours in milliseconds
+const STATE_CLEANUP_DELAY = 5000; // 5 seconds
+const CACHE_TTL = 30000; // 30 seconds
+const CACHE_MAX_SIZE = 50;
+const INACTIVE_THRESHOLD = 60 * 60 * 1000; // 1 hour
+const CACHE_CLEANUP_AGE = 5 * 60 * 1000; // 5 minutes
+
 // Watch for file deletions in the download directory with debouncing
 // If a video file is deleted from disk, remove its torrent from the client and memory
 let fileWatchTimeout = null;
@@ -49,7 +57,7 @@ function processFileEvent(filename) {
           setTimeout(() => {
             delete torrents[magnet];
             console.log(`Torrent state cleaned up for: ${filename}`);
-          }, 5000);
+          }, STATE_CLEANUP_DELAY);
 
           break;
         }
@@ -109,18 +117,17 @@ const client = new WebTorrent({
 const torrents = {};
 const torrentCache = new Map(); // LRU cache for frequently accessed torrents
 
-// Auto-delete configuration
-const AUTO_DELETE_DELAY = 72 * 60 * 60 * 1000; // 72 hours in milliseconds
-
 // Performance helpers
 function updateTorrentCache(magnet, state) {
+  if (!magnet || !state) return;
+
   torrentCache.set(magnet, {
     ...state,
     cachedAt: Date.now(),
   });
 
   // Maintain cache size
-  if (torrentCache.size > 50) {
+  if (torrentCache.size > CACHE_MAX_SIZE) {
     const firstKey = torrentCache.keys().next().value;
     torrentCache.delete(firstKey);
   }
@@ -183,8 +190,7 @@ function getOrAddTorrent(magnet, cb, seekPosition = 0) {
 
   // Check cache first
   const cached = torrentCache.get(magnet);
-  if (cached && Date.now() - cached.cachedAt < 30000) {
-    // 30 second cache
+  if (cached && cached.cachedAt && Date.now() - cached.cachedAt < CACHE_TTL) {
     if (cb) cb(cached.torrent);
     return cached;
   }
@@ -412,10 +418,9 @@ function logResourceUsage() {
 // Periodic cleanup of inactive torrents
 function periodicCleanup() {
   const now = Date.now();
-  const inactiveThreshold = 60 * 60 * 1000; // 1 hour
 
   for (const [magnet, state] of Object.entries(torrents)) {
-    if (now - state.lastAccess > inactiveThreshold && !state.deleteTimer) {
+    if (now - state.lastAccess > INACTIVE_THRESHOLD && !state.deleteTimer) {
       console.log(`Cleaning up inactive torrent: ${magnet}`);
       destroyTorrent(magnet);
     }
@@ -423,8 +428,7 @@ function periodicCleanup() {
 
   // Clear old cache entries
   for (const [magnet, cached] of torrentCache.entries()) {
-    if (now - cached.cachedAt > 5 * 60 * 1000) {
-      // 5 minutes
+    if (now - cached.cachedAt > CACHE_CLEANUP_AGE) {
       torrentCache.delete(magnet);
     }
   }

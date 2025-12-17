@@ -2,21 +2,29 @@
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 
+// Constants
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_STREAMING = 10000;
+const RATE_LIMIT_POLLING = 5000;
+const RATE_LIMIT_PAGES = 100;
+const RATE_LIMIT_DEFAULT = 500;
+const MAX_INPUT_LENGTH = 1000;
+
 // Smart rate limiting for streaming applications
 export const rateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes window (longer for streaming)
+  windowMs: RATE_LIMIT_WINDOW,
   max: async (req) => {
     // Different limits based on endpoint type
     if (req.url.includes("/video") || req.url.includes("/audio")) {
-      return 10000; // Very high limit for media streaming
+      return RATE_LIMIT_STREAMING; // Very high limit for media streaming
     }
     if (req.url.includes("/subtitles") || req.url.includes("/status")) {
-      return 5000; // High limit for frequent polling endpoints
+      return RATE_LIMIT_POLLING; // High limit for frequent polling endpoints
     }
     if (req.url.includes("/player") || req.url.includes("/embed")) {
-      return 100; // Normal limit for page loads
+      return RATE_LIMIT_PAGES; // Normal limit for page loads
     }
-    return 500; // Default moderate limit
+    return RATE_LIMIT_DEFAULT; // Default moderate limit
   },
   message: {
     error: "Rate limit exceeded. Please wait before making more requests.",
@@ -86,7 +94,7 @@ export function sanitizeInput(input) {
   return input
     .trim()
     .replace(/[<>\"'&]/g, "") // Remove potentially dangerous characters
-    .substring(0, 1000); // Limit length
+    .substring(0, MAX_INPUT_LENGTH);
 }
 
 // Validate file paths to prevent directory traversal
