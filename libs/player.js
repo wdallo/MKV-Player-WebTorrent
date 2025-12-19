@@ -1728,16 +1728,6 @@ class SubtitlesManager {
       const screenHeight = window.screen.height;
       const videoRect = this.videoElement.getBoundingClientRect();
 
-      // Calculate appropriate font size based on video size
-      const baseFontSize = Math.max(
-        16,
-        Math.min(32, Math.floor(videoRect.width / 40))
-      );
-      const fullscreenFontSize = Math.max(
-        24,
-        Math.min(48, Math.floor(screenWidth / 60))
-      );
-
       this.octopus = new window.SubtitlesOctopus({
         video: this.videoElement,
         subContent: subtitleContent,
