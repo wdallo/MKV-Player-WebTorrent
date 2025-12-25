@@ -19,25 +19,41 @@ export function isValidMagnet(url) {
       return false;
     }
 
-    // Enhanced regex for comprehensive magnet validation
-    const magnetRegex =
-      /^magnet:\?xt=urn:(btih|sha1|md5):[a-zA-Z0-9]{32,40}(&[a-zA-Z0-9%._~:/?#\[\]@!$&'()*+,;=-]*)?$/;
-
-    if (!magnetRegex.test(url)) {
+    // Check if it starts with magnet:
+    if (!url.startsWith("magnet:?")) {
       return false;
     }
 
-    // Additional security checks
-    if (/[<>"'\\]/.test(url)) {
+    // Must have xt parameter with btih hash
+    if (!url.includes("xt=urn:btih:")) {
+      return false;
+    }
+
+    // Extract and validate the info hash
+    const xtMatch = url.match(/xt=urn:btih:([a-zA-Z0-9]{32,40})/);
+    if (!xtMatch || !xtMatch[1]) {
+      return false;
+    }
+
+    const hash = xtMatch[1];
+    if (hash.length < MIN_HASH_LENGTH || hash.length > MAX_HASH_LENGTH) {
+      return false;
+    }
+
+    // Additional security checks - only block truly dangerous characters
+    // Allow single quotes (common in titles) but block script injection attempts
+    if (/[<>"\\]/.test(url)) {
       console.warn(
         "[SECURITY] Magnet URI contains potentially unsafe characters"
       );
       return false;
     }
 
-    // Validate that xt parameter exists and has proper format
-    const xtMatch = url.match(/[?&]xt=([^&]*)/i);
-    if (!xtMatch || !xtMatch[1]) {
+    // Check for common magnet URI structure - simplified but secure
+    // Allow standard URI characters and percent-encoded values
+    const validParams = /^magnet:\?[a-zA-Z0-9._~:/?#\[\]@!$&'()*+,;=%-]+$/;
+    if (!validParams.test(url)) {
+      console.warn("[VALIDATION] Magnet URI contains invalid characters:", url);
       return false;
     }
 

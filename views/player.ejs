@@ -112,7 +112,6 @@
           background: #222;
           color: #fff;
         "
-        onclick="this.select();"
       />
       <script>
         document.addEventListener("DOMContentLoaded", () => {
@@ -125,6 +124,11 @@
           }/embed?url=${encodeURIComponent(
             magnetUrl
           )}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
+
+          // Add click handler for embed input selection
+          embedInput.addEventListener("click", function () {
+            this.select();
+          });
         });
       </script>
     </div>
@@ -203,7 +207,7 @@
             retryButton.style.border = "none";
             retryButton.style.borderRadius = "4px";
             retryButton.style.cursor = "pointer";
-            retryButton.onclick = () => location.reload();
+            retryButton.addEventListener("click", () => location.reload());
 
             // Assemble the error display
             errorContainer.appendChild(iconDiv);

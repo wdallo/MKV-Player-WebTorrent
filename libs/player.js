@@ -3034,10 +3034,17 @@ class VideoPlayerController {
 
   // Handle initialization errors
   handleInitializationError(error) {
-    this.ui.hideLoading();
-    this.ui.showError(error.message);
-    this.ui.showStep(`Player error: ${error.message}`);
-    this.statusPoller.stop();
+    if (this.ui) {
+      this.ui.hideLoading();
+      this.ui.showError(error.message);
+      this.ui.showStep(`Player error: ${error.message}`);
+    } else {
+      console.error("Player initialization failed - UI not available:", error);
+    }
+
+    if (this.statusPoller) {
+      this.statusPoller.stop();
+    }
   }
 
   // Cleanup resources and notify server when leaving page

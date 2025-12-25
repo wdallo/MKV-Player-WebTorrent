@@ -58,9 +58,11 @@ export const securityHeaders = helmet({
         "'self'",
         "'unsafe-inline'",
         "'unsafe-eval'",
+        "'unsafe-hashes'",
         "https://cdn.jsdelivr.net",
         "https://cdn.plyr.io/",
       ],
+      scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"],
       imgSrc: ["'self'", "data:", "blob:"],
       mediaSrc: ["'self'", "blob:"],
       connectSrc: [
