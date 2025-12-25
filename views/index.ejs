@@ -40,7 +40,7 @@
             <input type="file" id="torrent-file" accept=".torrent" style="display: none;" />
             <div class="file-upload-content">
               <p>Drop a .torrent file here or click to select</p>
-              <button type="button" class="magnet-form-btn" onclick="document.getElementById('torrent-file').click()">
+              <button type="button" id="choose-file-btn" class="magnet-form-btn">
                 Choose Torrent File
               </button>
             </div>
@@ -104,8 +104,14 @@
         // File input handling
         const fileInput = document.getElementById('torrent-file');
         const uploadArea = document.getElementById('file-upload-area');
+        const chooseFileBtn = document.getElementById('choose-file-btn');
 
         fileInput.addEventListener('change', handleFileSelect);
+        
+        // Choose file button click handler
+        chooseFileBtn.addEventListener('click', function() {
+          fileInput.click();
+        });
 
         // Drag and drop functionality
         uploadArea.addEventListener('dragover', function(e) {
