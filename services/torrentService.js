@@ -11,6 +11,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
 
+// Ensure download directory exists
+if (!fs.existsSync(DOWNLOAD_DIR)) {
+  try {
+    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+    console.log(`Created downloads directory: ${DOWNLOAD_DIR}`);
+  } catch (error) {
+    console.error(`Failed to create downloads directory: ${error.message}`);
+  }
+}
+
 // Constants
 const AUTO_DELETE_DELAY = 72 * 60 * 60 * 1000; // 72 hours in milliseconds
 const STATE_CLEANUP_DELAY = 5000; // 5 seconds
@@ -67,23 +77,29 @@ function processFileEvent(filename) {
 }
 
 try {
-  fs.watch(DOWNLOAD_DIR, { persistent: false }, (eventType, filename) => {
-    if (eventType === "rename" && filename) {
-      // Debounce file events to prevent excessive processing
-      fileEventQueue.set(filename, Date.now());
+  // Only setup file watching if directory exists and is accessible
+  if (fs.existsSync(DOWNLOAD_DIR)) {
+    fs.watch(DOWNLOAD_DIR, { persistent: false }, (eventType, filename) => {
+      if (eventType === "rename" && filename) {
+        // Debounce file events to prevent excessive processing
+        fileEventQueue.set(filename, Date.now());
 
-      if (fileWatchTimeout) clearTimeout(fileWatchTimeout);
+        if (fileWatchTimeout) clearTimeout(fileWatchTimeout);
 
-      fileWatchTimeout = setTimeout(() => {
-        for (const [file] of fileEventQueue) {
-          processFileEvent(file);
-        }
-        fileEventQueue.clear();
-      }, PERF_CONFIG.FILE_WATCH_DEBOUNCE);
-    }
-  });
+        fileWatchTimeout = setTimeout(() => {
+          for (const [file] of fileEventQueue) {
+            processFileEvent(file);
+          }
+          fileEventQueue.clear();
+        }, PERF_CONFIG.FILE_WATCH_DEBOUNCE);
+      }
+    });
+    console.log(`File watching setup for: ${DOWNLOAD_DIR}`);
+  } else {
+    console.warn(`Download directory does not exist, file watching disabled: ${DOWNLOAD_DIR}`);
+  }
 } catch (e) {
-  console.error("Failed to watch download directory:", e);
+  console.error("Failed to watch download directory:", e.message);
 }
 
 // Create a WebTorrent client with optimized performance settings

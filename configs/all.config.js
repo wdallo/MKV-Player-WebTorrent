@@ -43,8 +43,8 @@ export const PLAYER_CONFIG = {
   WATERMARK_CONTENT: "Demo Watermark", // Watermark text
 
   // Cleanup behavior
-  MANUAL_CLEANUP: false, // Immediate cleanup on close
-  AUTO_DELETE_HOURS: 48, // Auto-delete after (hours)
+  MANUAL_CLEANUP: true, // Immediate cleanup on close
+  AUTO_DELETE_HOURS: 24, // Auto-delete after (hours)
 
   // Debug
   DEBUG_MODE: true, // Enable debug logging
