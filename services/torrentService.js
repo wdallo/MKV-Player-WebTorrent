@@ -9,7 +9,15 @@ import { PERF_CONFIG } from "../configs/all.config.js";
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
+
+// Use environment variable for downloads directory (set by electron-main.cjs for packaged builds)
+// or global variable (set by electron-server.cjs) or fallback to local downloads
+const DOWNLOAD_DIR =
+  process.env.DOWNLOADS_DIR ||
+  global.DOWNLOADS_DIR ||
+  path.join(__dirname, "../downloads");
+
+console.log(`[TORRENT] Using downloads directory: ${DOWNLOAD_DIR}`);
 
 // Ensure download directory exists
 if (!fs.existsSync(DOWNLOAD_DIR)) {
@@ -96,7 +104,9 @@ try {
     });
     console.log(`File watching setup for: ${DOWNLOAD_DIR}`);
   } else {
-    console.warn(`Download directory does not exist, file watching disabled: ${DOWNLOAD_DIR}`);
+    console.warn(
+      `Download directory does not exist, file watching disabled: ${DOWNLOAD_DIR}`
+    );
   }
 } catch (e) {
   console.error("Failed to watch download directory:", e.message);

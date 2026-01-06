@@ -3,7 +3,7 @@
   "productName": "MKV Video Player",
   "version": "1.0.0",
   "type": "module",
-  "main": "electron-main.cjs",
+  "main": "electron-main.js",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js --no-debug",
@@ -44,10 +44,8 @@
   "config": {
     "forge": {
       "packagerConfig": {
-        "name": "MKV Video Player",
-        "asar": {
-          "unpack": "{*.js,*.cjs,*.mjs,*.json,node_modules/**/*,controllers/**/*,libs/**/*,routes/**/*,services/**/*,utils/**/*,views/**/*,configs/**/*,downloads/**/*,*.node,*.wasm,*.exe,*.dll,*.so,*.dylib}"
-        }
+        "name": "MKV-Video-Player",
+        "asar": false
       },
       "makers": [
         {

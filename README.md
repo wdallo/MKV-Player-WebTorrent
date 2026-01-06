@@ -1,10 +1,25 @@
 # MKV Player WebTorrent
 
 [![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
+[![Electron](https://img.shields.io/badge/Electron-39%2B-blue.svg)](https://electronjs.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Express](https://img.shields.io/badge/Express-4.x-lightgrey.svg)](https://expressjs.com/)
 
-> A modern, feature-rich Node.js application for streaming MKV/MP4 video files directly from BitTorrent magnets with instant playback, advanced subtitle support, and intelligent resource management.
+> A modern, cross-platform video player application for streaming MKV/MP4 files directly from BitTorrent magnets with instant playback, advanced subtitle support, and intelligent resource management. Available as both a **web application** and a **native desktop app** powered by Electron.
+
+## 🎯 Deployment Options
+
+### 🌐 **Web Application**
+
+- Run as a traditional Node.js web server
+- Access via web browser at `localhost:3000`
+- Perfect for server deployments and remote access
+
+### 🖥️ **Desktop Application**
+
+- Native desktop app built with Electron
+- Familiar desktop experience with system integration
+- Custom menus, keyboard shortcuts, and native dialogs
 
 ## ✨ Key Features
 
@@ -57,7 +72,16 @@
 - **Memory Optimization**: Automatic cleanup of inactive torrents and cache management
 - **Connection Optimization**: Reduced connection limits and intelligent peer management
 
-### 🛠 **Developer Experience**
+### �️ **Desktop Integration (Electron)**
+
+- **Native Desktop App**: Executable
+- **System Integration**: Native window controls, taskbar icon, and system tray
+- **Menu Integration**: File menu with magnet link dialog and keyboard shortcuts
+- **Custom Dialogs**: Native input dialogs for magnet links with validation
+- **Auto Server Management**: Automatically starts and stops the Express server
+- **Installer Packages**: Professional Windows installers with Squirrel
+
+### �🛠 **Developer Experience**
 
 - **Live System Monitoring**: Real-time Node.js resource stats at `/sysinfo`
 - **Comprehensive Logging**: Detailed debug information and error tracking
@@ -122,66 +146,78 @@
 ```
 MKV-Player-WebTorrent/
 ├── 📁 app.js                     # Express server & middleware setup
-├── 📁 package.json               # Dependencies & scripts
-├── 📁 package-lock.json          # Dependency lock file
-├── 📁 favicon.ico                # Application icon
-├── 📁 .npmrc, .gitignore         # Configuration files
-│
-├── 📂 configs/                  # Centralized configuration
-│   └── all.config.js            # PERF_CONFIG and PLAYER_CONFIG exports
-│
-├── 📂 controllers/              # Business logic controllers
-│   ├── audioController.js       # Audio track management API
-│   ├── playerController.js      # Player page rendering & config
-│   ├── statusController.js      # Torrent status & progress API
-│   ├── subtitleController.js    # Subtitle management API
-│   └── videoController.js       # Video streaming & file serving
-│
-├── 📂 routes/                    # Express route definitions
-│   ├── audioRoutes.js           # /audio-tracks endpoint
-│   ├── playerRoutes.js          # /player endpoint
-│   ├── embedRoutes.js           # /embed endpoint for embeddable player
-│   ├── statusRoutes.js          # /status, /goodbye endpoints
-│   ├── subtitleRoutes.js        # /subtitles, /subtitle-tracks endpoints
-│   └── videoRoutes.js           # /video endpoint
-│
-├── 📂 services/                  # Core business services
-│   └── torrentService.js        # WebTorrent management & lifecycle
-│
-├── 📂 utils/                     # Utility functions & helpers
-│   ├── magnetValidator.js       # Enhanced magnet link validation utility
-│   └── security.js              # Security middleware & utilities (rate limiting, CSP, etc.)
-│
-├── 📂 libs/                      # Frontend assets & libraries
-│   ├── player.js                # Main player application logic
-│   ├── torrentPraser.js         # Parse Torrent file to get magnet
-│   └── 📂 styles/               # CSS stylesheets
-│       ├── style.css            # Custom UI styles
-│       ├── embed.css            # Embed player styles
-│       └── plyr.css             # Plyr video player styles
-│   ├── 📂 fonts/                # Subtitle font files
-│   │   ├── ARIALBD.TTF          # Subtitle font (Arial Bold)
-│   │   └── NotoSansJP-Bold.ttf  # Japanese subtitle font
-│   └── 📂 octopus/              # SubtitlesOctopus renderer
-│       ├── subtitles-octopus.js # ASS/SSA subtitle renderer
-│       ├── subtitles-octopus-worker.js
-│       ├── subtitles-octopus-worker-legacy.js
-│       └── subtitles-octopus-worker.wasm
-│
-├── 📂 views/                     # EJS template files
-│   ├── index.ejs                # Home page template
-│   ├── player.ejs               # Video player interface
-│   ├── embed.ejs                # Embeddable player view
-│   └── sysinfo.ejs              # System monitoring dashboard
-│
-└── 📂 downloads/                 # Temporary torrent file storage
+### 📁 Project Structure
+
 ```
+
+MKV-Player-WebTorrent/
+│
+├── 📁 app.js # Main Express server application
+├── 📁 electron-main.js # Electron main process (desktop app)
+├── 📁 launcher.js # Universal launcher (web/desktop/dev)
+├── 📁 preload.js # Electron preload script (security)
+├── 📁 package.json # Dependencies & scripts
+├── 📁 package-lock.json # Dependency lock file
+├── 📁 favicon.ico # Application icon
+├── 📁 .npmrc, .gitignore # Configuration files
+│
+├── 📂 configs/ # Centralized configuration
+│ └── all.config.js # PERF_CONFIG and PLAYER_CONFIG exports
+│
+├── 📂 controllers/ # Business logic controllers
+│ ├── audioController.js # Audio track management API
+│ ├── playerController.js # Player page rendering & config
+│ ├── statusController.js # Torrent status & progress API
+│ ├── subtitleController.js # Subtitle management API
+│ └── videoController.js # Video streaming & file serving
+│
+├── 📂 routes/ # Express route definitions
+│ ├── audioRoutes.js # /audio-tracks endpoint
+│ ├── playerRoutes.js # /player endpoint
+│ ├── embedRoutes.js # /embed endpoint for embeddable player
+│ ├── statusRoutes.js # /status, /goodbye endpoints
+│ ├── subtitleRoutes.js # /subtitles, /subtitle-tracks endpoints
+│ └── videoRoutes.js # /video endpoint
+│
+├── 📂 services/ # Core business services
+│ └── torrentService.js # WebTorrent management & lifecycle
+│
+├── 📂 utils/ # Utility functions & helpers
+│ ├── magnetValidator.js # Enhanced magnet link validation utility
+│ └── security.js # Security middleware & utilities (rate limiting, CSP, etc.)
+│
+├── 📂 libs/ # Frontend assets & libraries
+│ ├── player.js # Main player application logic
+│ ├── torrentPraser.js # Parse Torrent file to get magnet
+│ └── 📂 styles/ # CSS stylesheets
+│ ├── style.css # Custom UI styles
+│ ├── embed.css # Embed player styles
+│ └── plyr.css # Plyr video player styles
+│ ├── 📂 fonts/ # Subtitle font files
+│ │ ├── ARIALBD.TTF # Subtitle font (Arial Bold)
+│ │ └── NotoSansJP-Bold.ttf # Japanese subtitle font
+│ └── 📂 octopus/ # SubtitlesOctopus renderer
+│ ├── subtitles-octopus.js # ASS/SSA subtitle renderer
+│ ├── subtitles-octopus-worker.js
+│ ├── subtitles-octopus-worker-legacy.js
+│ └── subtitles-octopus-worker.wasm
+│
+├── 📂 views/ # EJS template files
+│ ├── index.ejs # Home page template
+│ ├── player.ejs # Video player interface
+│ ├── embed.ejs # Embeddable player view
+│ └── sysinfo.ejs # System monitoring dashboard
+│
+└── 📂 downloads/ # Temporary torrent file storage
+
+````
 
 ### Technology Stack
 
 | Component            | Technology                  | Purpose                                |
 | -------------------- | --------------------------- | -------------------------------------- |
 | **Backend**          | Node.js + Express           | HTTP server & API endpoints            |
+| **Desktop App**      | Electron                    | Native cross-platform desktop wrapper |
 | **Security**         | Helmet + express-rate-limit | Security headers & smart rate limiting |
 | **Streaming**        | WebTorrent                  | P2P video streaming                    |
 | **Video Processing** | FFmpeg                      | Subtitle extraction & video analysis   |
@@ -205,7 +241,7 @@ MKV-Player-WebTorrent/
    ```bash
    git clone https://github.com/wdallo/MKV-Player-WebTorrent.git
    cd MKV-Player-WebTorrent
-   ```
+````
 
 2. **Install dependencies**
 
@@ -214,25 +250,115 @@ MKV-Player-WebTorrent/
    ```
 
    **Key Dependencies Installed:**
-
+   - `electron` - Desktop application framework
+   - `@electron-forge/cli` - Build and packaging tools
    - `express-rate-limit` - Smart rate limiting for streaming applications
    - `helmet` - Security headers and content security policy
    - `webtorrent` - P2P streaming technology
    - `ffmpeg-static` - Video processing and subtitle extraction
    - `plyr` - Modern video player interface
 
-3. **Start the server**
+## 🖥️ Desktop Application
 
-   ```bash
-   npm start
-   # or
-   node app.js
-   ```
+### Quick Launch (Recommended)
 
-4. **Open in browser**
-   ```
-   http://localhost:3000
-   ```
+Use the universal launcher to start the app in different modes:
+
+```bash
+# Desktop application (default Electron app)
+node launcher.js electron
+
+# Web server only
+node launcher.js web
+
+# Development mode with auto-reload
+node launcher.js dev
+
+# Show launcher help
+node launcher.js help
+```
+
+### NPM Scripts
+
+```bash
+# Launch desktop app
+npm run electron
+
+# Launch desktop app in development mode
+npm run electron-dev
+
+# Start web server only
+npm start
+# or
+npm run web
+
+# Build desktop executables
+npm run build
+
+# Package without installer (faster)
+npm run electron-pack
+```
+
+### Desktop Features
+
+- **🎮 Native Menu**: File → Open Magnet Link (Ctrl+O)
+- **⌨️ Keyboard Shortcuts**:
+  - `Ctrl+O` - Open magnet dialog
+  - `Ctrl+R` - Reload player
+  - `Ctrl+Shift+R` - Force reload
+  - `F11` - Toggle fullscreen
+- **🎯 Auto Server**: Automatically starts/stops the web server
+- **📱 Native Dialogs**: Custom input dialogs for magnet links
+- **🔄 Window Management**: Minimize, close, and fullscreen controls
+
+### Build Distribution
+
+Create distributable desktop applications:
+
+```bash
+# Build for current platform
+npm run build
+
+# Package only (no installer)
+npm run electron-pack
+```
+
+**Output locations:**
+
+- **Executables**: `./out/MKV-Video-Player-{platform}/`
+- **Installers**: `./out/make/`
+- **ZIP packages**: `./out/make/zip/`
+
+## 🌐 Web Application
+
+### Traditional Web Server
+
+Perfect for server deployments, remote access, or development:
+
+```bash
+# Start web server
+npm start
+# or
+node app.js
+# or
+node launcher.js web
+```
+
+**Access the application:**
+
+```
+http://localhost:3000
+```
+
+### Development Mode
+
+For active development with auto-reload:
+
+```bash
+npm run dev
+```
+
+This starts the web server with nodemon for automatic restarts on file changes.
 
 ## 📖 Usage Guide
 
@@ -703,6 +829,67 @@ This will provide detailed console output for:
 | **Edge**    | 90+     | ✅ Full support               |
 | **Mobile**  | Latest  | ⚠️ Performance dependent      |
 
+## 🔧 Development & Deployment
+
+### Development Commands
+
+```bash
+# Development with auto-reload
+npm run dev                    # Web server with nodemon
+npm run electron-dev           # Desktop app with DevTools
+
+# Standard launch
+npm start                      # Web server only
+npm run electron              # Desktop application
+
+# Universal launcher
+node launcher.js dev          # Development mode
+node launcher.js web          # Web server
+node launcher.js electron     # Desktop app
+```
+
+### Build & Distribution
+
+```bash
+# Build desktop executables
+npm run build                 # Full build (installers + ZIP)
+npm run electron-pack        # Package only (no installers)
+
+# Build outputs
+./out/MKV-Video-Player-win32-x64/     # Windows executable
+./out/make/zip/                       # Portable ZIP files
+./out/make/squirrel.windows/          # Windows installer
+```
+
+### Deployment Options
+
+#### 1. **Desktop Distribution**
+
+- **Portable ZIP**: Extract and run - no installation needed
+- **Windows Installer**: Professional installer with auto-update support
+- **Cross-platform**: Build for Windows, macOS, and Linux
+
+#### 2. **Web Server Deployment**
+
+- **Local Development**: `npm start` on localhost:3000
+- **Production Server**: Deploy to VPS/cloud with reverse proxy
+- **Docker**: Containerized deployment (Dockerfile not included)
+
+#### 3. **Hybrid Approach**
+
+- Use desktop app for personal use
+- Deploy web version for sharing/remote access
+- Same codebase, different deployment methods
+
+### Configuration
+
+Key configuration files:
+
+- [`package.json`](package.json) - Dependencies and build settings
+- [`configs/all.config.js`](configs/all.config.js) - Application configuration
+- [`electron-main.js`](electron-main.js) - Desktop app settings
+- [`app.js`](app.js) - Web server configuration
+
 ## 🤝 Contributing
 
 We welcome contributions! Please follow these guidelines:
@@ -745,6 +932,7 @@ This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
+- **Electron** - Cross-platform desktop application framework with native system integration
 - **WebTorrent** - P2P streaming technology with optimized piece selection
 - **Plyr** - Modern video player interface with custom control integration
 - **SubtitlesOctopus** - Advanced subtitle rendering with performance optimizations

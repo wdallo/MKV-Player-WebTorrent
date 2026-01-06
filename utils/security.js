@@ -44,7 +44,9 @@ export const rateLimiter = rateLimit({
       req.ip === "::ffff:127.0.0.1" ||
       req.hostname === "localhost";
 
-    const isDevelopment = process.env.NODE_ENV === "development";
+    const isDevelopment =
+      process.env.NODE_ENV === "development" ||
+      process.env.NODE_ENV === "electron";
     const isElectron =
       typeof process !== "undefined" &&
       process.versions &&
@@ -177,7 +179,9 @@ export function errorHandler(err, req, res, next) {
   });
 
   // Don't leak error details in production
-  const isDevelopment = process.env.NODE_ENV === "development";
+  const isDevelopment =
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "electron";
 
   res.status(err.status || 500).json({
     error: isDevelopment ? err.message : "Internal Server Error",

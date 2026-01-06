@@ -23,6 +23,44 @@ body {
   min-height: 100vh;
 }
 
+/* Global Scrollbar Styles for Desktop App */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #181818;
+  border-radius: 5px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #444, #333);
+  border-radius: 5px;
+  border: 1px solid #222;
+  transition: background 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #555, #444);
+  border: 1px solid #333;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(135deg, #666, #555);
+}
+
+*::-webkit-scrollbar-corner {
+  background: #181818;
+}
+
+/* Firefox scrollbar styling */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #444 #181818;
+  scroll-behavior: smooth;
+}
+
 .retry-button {
   display: none;
   background: #2196f3;
@@ -33,7 +71,9 @@ body {
   cursor: pointer;
   margin: 10px 0;
   /* Performance optimizations */
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.1s ease;
   will-change: background-color;
 }
 
@@ -465,7 +505,9 @@ h1 {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 2px 8px #0002;
-  transition: background 0.2s, transform 0.1s;
+  transition:
+    background 0.2s,
+    transform 0.1s;
 }
 .magnet-form-btn:hover,
 .magnet-form-btn:focus {
