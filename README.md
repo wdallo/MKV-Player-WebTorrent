@@ -145,12 +145,6 @@
 
 ```
 MKV-Player-WebTorrent/
-├── 📁 app.js                     # Express server & middleware setup
-### 📁 Project Structure
-
-```
-
-MKV-Player-WebTorrent/
 │
 ├── 📁 app.js # Main Express server application
 ├── 📁 electron-main.js # Electron main process (desktop app)
@@ -210,14 +204,14 @@ MKV-Player-WebTorrent/
 │
 └── 📂 downloads/ # Temporary torrent file storage
 
-````
+```
 
 ### Technology Stack
 
 | Component            | Technology                  | Purpose                                |
 | -------------------- | --------------------------- | -------------------------------------- |
 | **Backend**          | Node.js + Express           | HTTP server & API endpoints            |
-| **Desktop App**      | Electron                    | Native cross-platform desktop wrapper |
+| **Desktop App**      | Electron                    | Native cross-platform desktop wrapper  |
 | **Security**         | Helmet + express-rate-limit | Security headers & smart rate limiting |
 | **Streaming**        | WebTorrent                  | P2P video streaming                    |
 | **Video Processing** | FFmpeg                      | Subtitle extraction & video analysis   |
@@ -241,6 +235,8 @@ MKV-Player-WebTorrent/
    ```bash
    git clone https://github.com/wdallo/MKV-Player-WebTorrent.git
    cd MKV-Player-WebTorrent
+   ```
+
 ````
 
 2. **Install dependencies**
@@ -943,3 +939,4 @@ This project is licensed under the MIT License.
 ---
 
 _Star ⭐ this repository if you find it useful!_
+````
