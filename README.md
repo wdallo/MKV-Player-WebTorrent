@@ -238,8 +238,6 @@ MKV-Player-WebTorrent/
    cd MKV-Player-WebTorrent
    ```
 
-````
-
 2. **Install dependencies**
 
    ```bash
@@ -247,7 +245,6 @@ MKV-Player-WebTorrent/
    ```
 
    **Key Dependencies Installed:**
-
    - `electron` - Desktop application framework
    - `@electron-forge/cli` - Build and packaging tools
    - `express-rate-limit` - Smart rate limiting for streaming applications
@@ -941,4 +938,7 @@ This project is licensed under the MIT License.
 ---
 
 _Star ⭐ this repository if you find it useful!_
-````
+
+```
+
+```
