@@ -80,7 +80,6 @@
 - **Custom Dialogs**: Native input dialogs for magnet links with validation
 - **Auto Server Management**: Automatically starts and stops the Express server
 - **Cross-Platform**: Windows, macOS, and Linux support
-- **Portable Builds**: ZIP distributions for easy deployment
 - **Installer Packages**: Professional Windows installers with Squirrel
 
 ### 🛠️ **Developer Experience**
@@ -322,7 +321,6 @@ npm run electron-pack
 
 - **Executables**: `./out/MKV-Video-Player-{platform}/`
 - **Installers**: `./out/make/`
-- **ZIP packages**: `./out/make/zip/`
 
 ## 🌐 Web Application
 
@@ -847,12 +845,11 @@ node launcher.js electron     # Desktop app
 
 ```bash
 # Build desktop executables
-npm run build                 # Full build (installers + ZIP)
+npm run build                 # Full build (installers )
 npm run electron-pack        # Package only (no installers)
 
 # Build outputs
 ./out/MKV-Video-Player-win32-x64/     # Windows executable
-./out/make/zip/                       # Portable ZIP files
 ./out/make/squirrel.windows/          # Windows installer
 ```
 
@@ -860,9 +857,7 @@ npm run electron-pack        # Package only (no installers)
 
 #### 1. **Desktop Distribution**
 
-- **Portable ZIP**: Extract and run - no installation needed
 - **Windows Installer**: Professional installer with auto-update support
-- **Cross-platform**: Build for Windows, macOS, and Linux
 
 #### 2. **Web Server Deployment**
 
