@@ -18,7 +18,11 @@ export const rateLimiter = rateLimit({
     if (req.url.includes("/video") || req.url.includes("/audio")) {
       return RATE_LIMIT_STREAMING; // Very high limit for media streaming
     }
-    if (req.url.includes("/subtitles") || req.url.includes("/status")) {
+    if (
+      req.url.includes("/subtitles") ||
+      req.url.includes("/status") ||
+      req.url.includes("/health")
+    ) {
       return RATE_LIMIT_POLLING; // High limit for frequent polling endpoints
     }
     if (req.url.includes("/player") || req.url.includes("/embed")) {
@@ -40,9 +44,16 @@ export const rateLimiter = rateLimit({
       req.ip === "::ffff:127.0.0.1" ||
       req.hostname === "localhost";
 
-    const isDevelopment = process.env.NODE_ENV === "development";
+    const isDevelopment =
+      process.env.NODE_ENV === "development" ||
+      process.env.NODE_ENV === "electron";
+    const isElectron =
+      typeof process !== "undefined" &&
+      process.versions &&
+      process.versions.electron;
 
-    return isLocalhost || isDevelopment;
+    // Skip for localhost, development, or Electron environment
+    return isLocalhost || isDevelopment || isElectron;
   },
   // Don't count failed requests against limit
   skipFailedRequests: true,
@@ -168,7 +179,9 @@ export function errorHandler(err, req, res, next) {
   });
 
   // Don't leak error details in production
-  const isDevelopment = process.env.NODE_ENV === "development";
+  const isDevelopment =
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "electron";
 
   res.status(err.status || 500).json({
     error: isDevelopment ? err.message : "Internal Server Error",
@@ -192,8 +205,23 @@ export function securityLogger(req, res, next) {
       timestamp: new Date().toISOString(),
     };
 
-    // Log suspicious activity
-    if (res.statusCode >= 400 || duration > 10000) {
+    // Log suspicious activity, but exclude legitimate requests
+    const isHealthCheck = req.url === "/health" || req.url === "/";
+    const isLocalhost =
+      req.ip === "::1" ||
+      req.ip === "127.0.0.1" ||
+      req.ip === "::ffff:127.0.0.1";
+    const isElectronAgent =
+      req.get("User-Agent")?.includes("electron") ||
+      req.get("User-Agent") === "node";
+
+    // Don't flag health checks from localhost/Electron as suspicious
+    const shouldLog =
+      (res.statusCode >= 400 || duration > 10000) &&
+      !(isHealthCheck && isLocalhost) &&
+      !(isElectronAgent && isLocalhost);
+
+    if (shouldLog) {
       console.warn("Suspicious Activity:", logData);
     }
   });

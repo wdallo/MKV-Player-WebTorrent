@@ -26,7 +26,7 @@ Thumbs.db
 # Build
 /dist/
 /build/
-
+/out/
 # Misc
 *.swp
 *.swo
