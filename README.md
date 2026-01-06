@@ -72,16 +72,18 @@
 - **Memory Optimization**: Automatic cleanup of inactive torrents and cache management
 - **Connection Optimization**: Reduced connection limits and intelligent peer management
 
-### �️ **Desktop Integration (Electron)**
+### 🖥️ **Desktop Integration (Electron)**
 
-- **Native Desktop App**: Executable
+- **Native Desktop App**: Standalone executable with embedded web server
 - **System Integration**: Native window controls, taskbar icon, and system tray
 - **Menu Integration**: File menu with magnet link dialog and keyboard shortcuts
 - **Custom Dialogs**: Native input dialogs for magnet links with validation
 - **Auto Server Management**: Automatically starts and stops the Express server
+- **Cross-Platform**: Windows, macOS, and Linux support
+- **Portable Builds**: ZIP distributions for easy deployment
 - **Installer Packages**: Professional Windows installers with Squirrel
 
-### �🛠 **Developer Experience**
+### 🛠️ **Developer Experience**
 
 - **Live System Monitoring**: Real-time Node.js resource stats at `/sysinfo`
 - **Comprehensive Logging**: Detailed debug information and error tracking
@@ -141,69 +143,68 @@
 
 ## 🏗 Architecture Overview
 
-### Project Structure
+### 📁 Project Structure
 
 ```
 MKV-Player-WebTorrent/
 │
-├── 📁 app.js # Main Express server application
-├── 📁 electron-main.js # Electron main process (desktop app)
-├── 📁 launcher.js # Universal launcher (web/desktop/dev)
-├── 📁 preload.js # Electron preload script (security)
-├── 📁 package.json # Dependencies & scripts
-├── 📁 package-lock.json # Dependency lock file
-├── 📁 favicon.ico # Application icon
-├── 📁 .npmrc, .gitignore # Configuration files
+├── 📁 app.js                     # Main Express server application
+├── 📁 electron-main.js           # Electron main process (desktop app)
+├── 📁 launcher.js                # Universal launcher (web/desktop/dev)
+├── 📁 preload.js                 # Electron preload script (security)
+├── 📁 package.json               # Dependencies & scripts
+├── 📁 package-lock.json          # Dependency lock file
+├── 📁 favicon.ico                # Application icon
+├── 📁 .npmrc, .gitignore         # Configuration files
 │
-├── 📂 configs/ # Centralized configuration
-│ └── all.config.js # PERF_CONFIG and PLAYER_CONFIG exports
+├── 📂 configs/                   # Centralized configuration
+│   └── all.config.js             # PERF_CONFIG and PLAYER_CONFIG exports
 │
-├── 📂 controllers/ # Business logic controllers
-│ ├── audioController.js # Audio track management API
-│ ├── playerController.js # Player page rendering & config
-│ ├── statusController.js # Torrent status & progress API
-│ ├── subtitleController.js # Subtitle management API
-│ └── videoController.js # Video streaming & file serving
+├── 📂 controllers/               # Business logic controllers
+│   ├── audioController.js        # Audio track management API
+│   ├── playerController.js       # Player page rendering & config
+│   ├── statusController.js       # Torrent status & progress API
+│   ├── subtitleController.js     # Subtitle management API
+│   └── videoController.js        # Video streaming & file serving
 │
-├── 📂 routes/ # Express route definitions
-│ ├── audioRoutes.js # /audio-tracks endpoint
-│ ├── playerRoutes.js # /player endpoint
-│ ├── embedRoutes.js # /embed endpoint for embeddable player
-│ ├── statusRoutes.js # /status, /goodbye endpoints
-│ ├── subtitleRoutes.js # /subtitles, /subtitle-tracks endpoints
-│ └── videoRoutes.js # /video endpoint
+├── 📂 routes/                    # Express route definitions
+│   ├── audioRoutes.js            # /audio-tracks endpoint
+│   ├── playerRoutes.js           # /player endpoint
+│   ├── embedRoutes.js            # /embed endpoint for embeddable player
+│   ├── statusRoutes.js           # /status, /goodbye endpoints
+│   ├── subtitleRoutes.js         # /subtitles, /subtitle-tracks endpoints
+│   └── videoRoutes.js            # /video endpoint
 │
-├── 📂 services/ # Core business services
-│ └── torrentService.js # WebTorrent management & lifecycle
+├── 📂 services/                  # Core business services
+│   └── torrentService.js         # WebTorrent management & lifecycle
 │
-├── 📂 utils/ # Utility functions & helpers
-│ ├── magnetValidator.js # Enhanced magnet link validation utility
-│ └── security.js # Security middleware & utilities (rate limiting, CSP, etc.)
+├── 📂 utils/                     # Utility functions & helpers
+│   ├── magnetValidator.js        # Enhanced magnet link validation utility
+│   └── security.js               # Security middleware & utilities (rate limiting, CSP, etc.)
 │
-├── 📂 libs/ # Frontend assets & libraries
-│ ├── player.js # Main player application logic
-│ ├── torrentPraser.js # Parse Torrent file to get magnet
-│ └── 📂 styles/ # CSS stylesheets
-│ ├── style.css # Custom UI styles
-│ ├── embed.css # Embed player styles
-│ └── plyr.css # Plyr video player styles
-│ ├── 📂 fonts/ # Subtitle font files
-│ │ ├── ARIALBD.TTF # Subtitle font (Arial Bold)
-│ │ └── NotoSansJP-Bold.ttf # Japanese subtitle font
-│ └── 📂 octopus/ # SubtitlesOctopus renderer
-│ ├── subtitles-octopus.js # ASS/SSA subtitle renderer
-│ ├── subtitles-octopus-worker.js
-│ ├── subtitles-octopus-worker-legacy.js
-│ └── subtitles-octopus-worker.wasm
+├── 📂 libs/                      # Frontend assets & libraries
+│   ├── player.js                 # Main player application logic
+│   ├── torrentPraser.js          # Parse Torrent file to get magnet
+│   └── 📂 styles/                # CSS stylesheets
+│       ├── style.css             # Custom UI styles
+│       ├── embed.css             # Embed player styles
+│       └── plyr.css              # Plyr video player styles
+│   ├── 📂 fonts/                 # Subtitle font files
+│   │   ├── ARIALBD.TTF           # Subtitle font (Arial Bold)
+│   │   └── NotoSansJP-Bold.ttf   # Japanese subtitle font
+│   └── 📂 octopus/               # SubtitlesOctopus renderer
+│       ├── subtitles-octopus.js  # ASS/SSA subtitle renderer
+│       ├── subtitles-octopus-worker.js
+│       ├── subtitles-octopus-worker-legacy.js
+│       └── subtitles-octopus-worker.wasm
 │
-├── 📂 views/ # EJS template files
-│ ├── index.ejs # Home page template
-│ ├── player.ejs # Video player interface
-│ ├── embed.ejs # Embeddable player view
-│ └── sysinfo.ejs # System monitoring dashboard
+├── 📂 views/                     # EJS template files
+│   ├── index.ejs                 # Home page template
+│   ├── player.ejs                # Video player interface
+│   ├── embed.ejs                 # Embeddable player view
+│   └── sysinfo.ejs               # System monitoring dashboard
 │
-└── 📂 downloads/ # Temporary torrent file storage
-
+└── 📂 downloads/                 # Temporary torrent file storage
 ```
 
 ### Technology Stack
@@ -246,6 +247,7 @@ MKV-Player-WebTorrent/
    ```
 
    **Key Dependencies Installed:**
+
    - `electron` - Desktop application framework
    - `@electron-forge/cli` - Build and packaging tools
    - `express-rate-limit` - Smart rate limiting for streaming applications
