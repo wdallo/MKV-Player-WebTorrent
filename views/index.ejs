@@ -6,118 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/libs/styles/style.css" />
     <style>
-      /* Console Modal Styles */
-      .console-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .console-content {
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 8px;
-        width: 80%;
-        height: 70%;
-        max-width: 1000px;
-        display: flex;
-        flex-direction: column;
-        color: #fff;
-      }
-
-      .console-header {
-        background: #333;
-        padding: 10px 15px;
-        border-bottom: 1px solid #555;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-radius: 8px 8px 0 0;
-      }
-
-      .console-close {
-        background: none;
-        border: none;
-        color: #fff;
-        font-size: 20px;
-        cursor: pointer;
-        padding: 0;
-        width: 30px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .console-close:hover {
-        background: #555;
-        border-radius: 4px;
-      }
-
-      .console-body {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-
-      .console-logs {
-        flex: 1;
-        padding: 10px;
-        overflow-y: auto;
-        font-family: 'Courier New', monospace;
-        font-size: 12px;
-        line-height: 1.4;
-        background: #000;
-      }
-
-      .console-input-area {
-        display: flex;
-        padding: 10px;
-        border-top: 1px solid #555;
-        background: #222;
-      }
-
-      .console-input {
-        flex: 1;
-        background: #333;
-        border: 1px solid #555;
-        color: #fff;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-family: 'Courier New', monospace;
-      }
-
-      .console-send {
-        background: #007bff;
-        color: #fff;
-        border: none;
-        padding: 8px 15px;
-        margin-left: 10px;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-
-      .console-send:hover {
-        background: #0056b3;
-      }
-
-      .console-log-entry {
-        margin: 2px 0;
-        padding: 2px 0;
-      }
-
-      .console-log-info { color: #87ceeb; }
-      .console-log-error { color: #ff6b6b; }
-      .console-log-warn { color: #ffa500; }
-      .console-log-success { color: #90EE90; }
     </style>
   </head>
   <body>
@@ -173,22 +61,7 @@
     </main>
     </main>
     
-    <!-- Console Modal -->
-    <div id="console-modal" class="console-modal" style="display: none;">
-      <div class="console-content">
-        <div class="console-header">
-          <span>MKV Player Console</span>
-          <button id="console-close" class="console-close">&times;</button>
-        </div>
-        <div class="console-body">
-          <div id="console-logs" class="console-logs"></div>
-          <div class="console-input-area">
-            <input type="text" id="console-input" class="console-input" placeholder="Type command..." />
-            <button id="console-send" class="console-send">Send</button>
-          </div>
-        </div>
-      </div>
-    </div>
+
 
     <footer class="footer">
       Created with ❤️ by
@@ -203,7 +76,6 @@
       document.addEventListener('DOMContentLoaded', function() {
         torrentParser = new TorrentParser();
         setupEventListeners();
-        initConsole(); // Initialize console functionality
       });
 
       function setupEventListeners() {
@@ -347,108 +219,6 @@
       function hideError() {
         const errorDiv = document.getElementById("magnet-error");
         errorDiv.style.display = "none";
-      }
-
-      // Console functionality
-      function initConsole() {
-        const consoleModal = document.getElementById('console-modal');
-        const consoleClose = document.getElementById('console-close');
-        const consoleLogs = document.getElementById('console-logs');
-        const consoleInput = document.getElementById('console-input');
-        const consoleSend = document.getElementById('console-send');
-
-        // Handle show console IPC message
-        if (window.electronAPI && window.electronAPI.onShowConsoleTab) {
-          window.electronAPI.onShowConsoleTab(() => {
-            showConsole();
-          });
-
-          // Handle console logs from server
-          window.electronAPI.onConsoleLog((event, logData) => {
-            addLogEntry(logData);
-          });
-        }
-
-        function showConsole() {
-          consoleModal.style.display = 'flex';
-          loadConsoleLogs();
-        }
-
-        function hideConsole() {
-          consoleModal.style.display = 'none';
-        }
-
-        async function loadConsoleLogs() {
-          if (window.electronAPI && window.electronAPI.getConsoleLogs) {
-            try {
-              const logs = await window.electronAPI.getConsoleLogs();
-              consoleLogs.innerHTML = '';
-              logs.forEach(log => addLogEntry(log));
-              consoleLogs.scrollTop = consoleLogs.scrollHeight;
-            } catch (error) {
-              console.error('Failed to load console logs:', error);
-            }
-          }
-        }
-
-        function addLogEntry(logData) {
-          const entry = document.createElement('div');
-          entry.className = `console-log-entry console-log-${logData.level}`;
-          entry.textContent = `[${new Date(logData.timestamp).toLocaleTimeString()}] ${logData.message}`;
-          consoleLogs.appendChild(entry);
-          consoleLogs.scrollTop = consoleLogs.scrollHeight;
-        }
-
-        async function executeCommand(command) {
-          if (window.electronAPI && window.electronAPI.executeCommand) {
-            try {
-              const result = await window.electronAPI.executeCommand(command);
-              addLogEntry({
-                level: result.success ? 'success' : 'error',
-                message: `> ${command}\n${result.output}`,
-                timestamp: new Date().toISOString()
-              });
-            } catch (error) {
-              addLogEntry({
-                level: 'error',
-                message: `> ${command}\nError: ${error.message}`,
-                timestamp: new Date().toISOString()
-              });
-            }
-          }
-        }
-
-        // Event listeners
-        consoleClose.addEventListener('click', hideConsole);
-        
-        consoleModal.addEventListener('click', (e) => {
-          if (e.target === consoleModal) hideConsole();
-        });
-
-        consoleSend.addEventListener('click', () => {
-          const command = consoleInput.value.trim();
-          if (command) {
-            executeCommand(command);
-            consoleInput.value = '';
-          }
-        });
-
-        consoleInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            const command = consoleInput.value.trim();
-            if (command) {
-              executeCommand(command);
-              consoleInput.value = '';
-            }
-          }
-        });
-
-        // ESC key to close console
-        document.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape' && consoleModal.style.display === 'flex') {
-            hideConsole();
-          }
-        });
       }
     </script>
   </body>
