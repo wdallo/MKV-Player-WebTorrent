@@ -1213,6 +1213,7 @@ class SubtitlesManager {
     this.magnetUrl = magnetUrl;
     this.initialized = false;
     this.octopus = null;
+    this.octopusReady = false; // Track when Octopus is fully ready
     this.lastSubtitleContent = "";
     this.pollInterval = null;
     this.subtitlesUrl = null;
@@ -1742,6 +1743,8 @@ class SubtitlesManager {
         maxRenderHeight: screenHeight,
         // Dynamic sizing based on screen
         onReady: () => {
+          console.log("SubtitlesOctopus is ready!");
+          this.octopusReady = true; // Mark Octopus as ready
           if (this.octopus && this.octopus.setTargetSize) {
             // Set target size for proper scaling
             this.octopus.setTargetSize(videoRect.width, videoRect.height);
@@ -1918,7 +1921,9 @@ class SubtitlesManager {
     if (this.octopus) {
       this.octopus.dispose();
       this.octopus = null;
+      this.octopusReady = false; // Reset readiness flag
     }
+    this.octopusReady = false; // Ensure flag is reset even if octopus was already null
     this.initialized = false;
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
@@ -3200,6 +3205,157 @@ class VideoPlayerController {
       if (CONFIG.DEBUG_MODE)
         console.error("Failed to clear localStorage:", err);
     }
+  }
+
+  // Check if subtitles are available for the current video
+  async checkSubtitlesAvailable() {
+    try {
+      if (!this.subtitlesManager) {
+        return false;
+      }
+
+      // Fetch available tracks
+      const tracks = await this.subtitlesManager.fetchAvailableTracks();
+
+      // Check if we have subtitle content or tracks available
+      const hasSubtitleContent =
+        this.subtitlesLoaded ||
+        (this.subtitlesManager.subtitlesUrl &&
+          this.subtitlesManager.subtitlesUrl.length > 0);
+      const hasAvailableTracks = tracks && tracks.length > 0;
+
+      if (CONFIG.DEBUG_MODE) {
+        console.log("Subtitle availability check:", {
+          hasSubtitleContent,
+          hasAvailableTracks,
+          tracksCount: tracks ? tracks.length : 0,
+          subtitlesUrl: this.subtitlesManager.subtitlesUrl,
+        });
+      }
+
+      return hasSubtitleContent || hasAvailableTracks;
+    } catch (error) {
+      if (CONFIG.DEBUG_MODE) {
+        console.error("Error checking subtitle availability:", error);
+      }
+      return false;
+    }
+  }
+
+  // Wait for subtitle status to become active
+  async waitForSubtitleStatus(maxWaitTime = 30000, checkInterval = 1000) {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+
+      const checkStatus = () => {
+        try {
+          // Check if we've exceeded the maximum wait time
+          if (Date.now() - startTime > maxWaitTime) {
+            if (CONFIG.DEBUG_MODE) {
+              console.warn(
+                "Subtitle status check timed out after",
+                maxWaitTime,
+                "ms"
+              );
+            }
+            resolve(false); // Resolve with false instead of rejecting to continue gracefully
+            return;
+          }
+
+          if (!this.subtitlesManager) {
+            resolve(false);
+            return;
+          }
+
+          const subtitles = this.subtitlesManager;
+
+          // Check multiple indicators for subtitle status
+          const hasInitializedSubtitles = subtitles.initialized;
+          const hasActiveTrack =
+            subtitles.currentTrack !== null &&
+            subtitles.currentTrack !== undefined;
+          const hasSubtitleUrl = subtitles.subtitlesUrl;
+          const hasOctopus = subtitles.octopus !== null;
+          const isOctopusReady = subtitles.octopusReady; // Check if Octopus is fully ready
+          const hasAvailableTracks =
+            subtitles.availableTracks && subtitles.availableTracks.length > 0;
+
+          if (CONFIG.DEBUG_MODE) {
+            console.log("Subtitle status check:", {
+              initialized: hasInitializedSubtitles,
+              activeTrack: hasActiveTrack,
+              currentTrack: subtitles.currentTrack,
+              hasSubtitleUrl: !!hasSubtitleUrl,
+              hasOctopus: hasOctopus,
+              octopusReady: isOctopusReady,
+              hasAvailableTracks: hasAvailableTracks,
+              availableTracksCount: subtitles.availableTracks
+                ? subtitles.availableTracks.length
+                : 0,
+            });
+          }
+
+          // For Octopus subtitles, consider ready when Octopus is initialized and ready
+          // For track-based subtitles, consider ready when tracks are available
+          const octopusSubtitlesReady =
+            hasOctopus && isOctopusReady && hasSubtitleUrl;
+          const trackSubtitlesReady =
+            hasAvailableTracks || (hasInitializedSubtitles && hasSubtitleUrl);
+
+          // Subtitles are considered "ready" when they're available for use, not necessarily active
+          const subtitlesReady = octopusSubtitlesReady || trackSubtitlesReady;
+
+          if (CONFIG.DEBUG_MODE) {
+            console.log("Detailed subtitle status:", {
+              hasOctopus,
+              isOctopusReady,
+              hasInitializedSubtitles,
+              hasSubtitleUrl: !!hasSubtitleUrl,
+              hasAvailableTracks,
+              octopusSubtitlesReady,
+              trackSubtitlesReady,
+              subtitlesReady,
+            });
+          }
+
+          if (subtitlesReady) {
+            if (CONFIG.DEBUG_MODE) {
+              const readyType = octopusSubtitlesReady
+                ? "Octopus"
+                : "Track-based";
+              console.log(`✅ Subtitles are now ready (${readyType})`);
+            }
+            resolve(true);
+            return;
+          }
+
+          // If we have subtitles but they're not ready yet, keep waiting
+          if (
+            hasSubtitleUrl ||
+            hasInitializedSubtitles ||
+            hasOctopus ||
+            hasAvailableTracks
+          ) {
+            if (CONFIG.DEBUG_MODE) {
+              console.log(
+                "Subtitles detected but not ready yet, continuing to wait..."
+              );
+            }
+          }
+
+          // Continue checking
+          setTimeout(checkStatus, checkInterval);
+        } catch (error) {
+          if (CONFIG.DEBUG_MODE) {
+            console.error("Error checking subtitle status:", error);
+          }
+          resolve(false); // Resolve with false to continue gracefully
+        }
+      };
+
+      // Start the status check
+      checkStatus();
+    });
   }
 }
 

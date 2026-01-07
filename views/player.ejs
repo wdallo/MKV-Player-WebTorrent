@@ -8,128 +8,6 @@
     <link rel="preload" as="style" href="/libs/styles/plyr.css" />
     <link rel="stylesheet" href="/libs/styles/plyr.css" />
     <link rel="stylesheet" href="/libs/styles/style.css" />
-    <style>
-      /* Console Modal Styles */
-      .console-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .console-content {
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 8px;
-        width: 80%;
-        height: 70%;
-        max-width: 1000px;
-        display: flex;
-        flex-direction: column;
-        color: #fff;
-      }
-
-      .console-header {
-        background: #333;
-        padding: 10px 15px;
-        border-bottom: 1px solid #555;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-radius: 8px 8px 0 0;
-      }
-
-      .console-close {
-        background: none;
-        border: none;
-        color: #fff;
-        font-size: 20px;
-        cursor: pointer;
-        padding: 0;
-        width: 30px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .console-close:hover {
-        background: #555;
-        border-radius: 4px;
-      }
-
-      .console-body {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-
-      .console-logs {
-        flex: 1;
-        padding: 10px;
-        overflow-y: auto;
-        font-family: "Courier New", monospace;
-        font-size: 12px;
-        line-height: 1.4;
-        background: #000;
-      }
-
-      .console-input-area {
-        display: flex;
-        padding: 10px;
-        border-top: 1px solid #555;
-        background: #222;
-      }
-
-      .console-input {
-        flex: 1;
-        background: #333;
-        border: 1px solid #555;
-        color: #fff;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-family: "Courier New", monospace;
-      }
-
-      .console-send {
-        background: #007bff;
-        color: #fff;
-        border: none;
-        padding: 8px 15px;
-        margin-left: 10px;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-
-      .console-send:hover {
-        background: #0056b3;
-      }
-
-      .console-log-entry {
-        margin: 2px 0;
-        padding: 2px 0;
-      }
-
-      .console-log-info {
-        color: #87ceeb;
-      }
-      .console-log-error {
-        color: #ff6b6b;
-      }
-      .console-log-warn {
-        color: #ffa500;
-      }
-      .console-log-success {
-        color: #90ee90;
-      }
-    </style>
 
     <script src="/libs/octopus/subtitles-octopus.js"></script>
   </head>
@@ -271,28 +149,6 @@
       </script>
     </div>
 
-    <!-- Console Modal -->
-    <div id="console-modal" class="console-modal" style="display: none">
-      <div class="console-content">
-        <div class="console-header">
-          <span>MKV Player Console</span>
-          <button id="console-close" class="console-close">&times;</button>
-        </div>
-        <div class="console-body">
-          <div id="console-logs" class="console-logs"></div>
-          <div class="console-input-area">
-            <input
-              type="text"
-              id="console-input"
-              class="console-input"
-              placeholder="Type command..."
-            />
-            <button id="console-send" class="console-send">Send</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <footer class="footer">
       Created with ❤️ by
       <a href="https://github.com/wdallo" target="_blank"> wdallo </a>
@@ -317,6 +173,27 @@
 
           console.log("Initializing player with magnet:", magnetUrl);
 
+          // Get loading elements
+          const loadingElement = document.getElementById("loading");
+          const overlay = document.getElementById("plyr-loading-overlay");
+          const plyrLoadingText = overlay?.querySelector(".plyr-loading-text");
+
+          // Function to update loading message
+          function updateLoadingMessage(message) {
+            if (loadingElement) {
+              loadingElement.style.display = "block";
+              loadingElement.textContent = message;
+            }
+            if (plyrLoadingText) {
+              plyrLoadingText.textContent = message;
+            }
+            if (overlay) {
+              overlay.style.display = "flex";
+            }
+          }
+
+          updateLoadingMessage("Loading video player...");
+
           const player = new VideoPlayerController(magnetUrl);
 
           // Make player globally accessible for context menu and debugging
@@ -325,9 +202,175 @@
           // Initialize with error handling
           await player.initialize();
 
+          // Check if subtitles exist and wait for SubtitlesOctopus to be ready
+          if (player.subtitlesManager) {
+            updateLoadingMessage("Checking for subtitles...");
+
+            // Ensure overlay stays visible during subtitle checking
+            if (overlay) {
+              overlay.style.display = "flex";
+            }
+
+            // Try to find subtitles with retry logic (max 3 attempts)
+            let subtitlesAvailable = false;
+            let attemptCount = 0;
+            const maxAttempts = 3;
+
+            while (attemptCount < maxAttempts && !subtitlesAvailable) {
+              attemptCount++;
+
+              if (attemptCount > 1) {
+                updateLoadingMessage(
+                  `Checking for subtitles... (attempt ${attemptCount}/${maxAttempts})`
+                );
+                // Ensure overlay stays visible during retry
+                if (overlay) {
+                  overlay.style.display = "flex";
+                }
+                // Wait a bit before retrying
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+              }
+
+              subtitlesAvailable = await player.checkSubtitlesAvailable();
+
+              // Keep overlay visible after checking
+              if (overlay) {
+                overlay.style.display = "flex";
+              }
+            }
+
+            if (subtitlesAvailable) {
+              updateLoadingMessage(
+                "Subtitles found, loading SubtitlesOctopus..."
+              );
+
+              // Ensure overlay stays visible during SubtitlesOctopus loading
+              if (overlay) {
+                overlay.style.display = "flex";
+              }
+
+              // Wait specifically for SubtitlesOctopus to be ready
+              const waitForOctopus = async () => {
+                return new Promise((resolve) => {
+                  const checkOctopus = () => {
+                    // Keep overlay visible during checks
+                    if (overlay) {
+                      overlay.style.display = "flex";
+                    }
+
+                    const subtitles = player.subtitlesManager;
+                    if (subtitles && subtitles.octopusReady) {
+                      console.log("✅ SubtitlesOctopus is ready!");
+                      resolve(true);
+                    } else {
+                      setTimeout(checkOctopus, 500);
+                    }
+                  };
+                  checkOctopus();
+                });
+              };
+
+              await waitForOctopus();
+              updateLoadingMessage("SubtitlesOctopus loaded successfully!");
+
+              // Give a moment for the message to be seen
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            } else {
+              console.log(
+                `No subtitles available after ${maxAttempts} attempts`
+              );
+              updateLoadingMessage(
+                "No subtitles found, proceeding without subtitles..."
+              );
+              // Give a moment for the message to be seen
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
+
+          // Check if multi audio tracks exist with retry logic
+          if (player.audioManager) {
+            updateLoadingMessage("Checking for audio tracks...");
+
+            // Ensure overlay stays visible during audio checking
+            if (overlay) {
+              overlay.style.display = "flex";
+            }
+
+            // Try to find audio tracks with retry logic (max 3 attempts)
+            let audioTracksAvailable = false;
+            let audioAttemptCount = 0;
+            const maxAudioAttempts = 3;
+
+            while (
+              audioAttemptCount < maxAudioAttempts &&
+              !audioTracksAvailable
+            ) {
+              audioAttemptCount++;
+
+              if (audioAttemptCount > 1) {
+                updateLoadingMessage(
+                  `Checking for audio tracks... (attempt ${audioAttemptCount}/${maxAudioAttempts})`
+                );
+                // Ensure overlay stays visible during retry
+                if (overlay) {
+                  overlay.style.display = "flex";
+                }
+                // Wait a bit before retrying
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+              }
+
+              // Check if audio manager has multiple tracks available
+              try {
+                await player.audioManager.initialize();
+                const audioTracks = player.audioManager.availableTracks || [];
+                audioTracksAvailable = audioTracks.length > 1; // Multiple tracks available
+              } catch (error) {
+                console.log(
+                  `Audio track check attempt ${audioAttemptCount} failed:`,
+                  error
+                );
+              }
+
+              // Keep overlay visible after checking
+              if (overlay) {
+                overlay.style.display = "flex";
+              }
+            }
+
+            if (audioTracksAvailable) {
+              updateLoadingMessage("Multi audio tracks found!");
+              console.log("✅ Multi audio tracks are available");
+              // Give a moment for the message to be seen
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            } else {
+              console.log(
+                `No multi audio tracks available after ${maxAudioAttempts} attempts`
+              );
+              updateLoadingMessage(
+                "Single audio track detected, proceeding..."
+              );
+              // Give a moment for the message to be seen
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
+
+          // Hide loading indicators now
+          if (loadingElement) {
+            loadingElement.style.display = "none";
+          }
+          if (overlay) {
+            overlay.style.display = "none";
+          }
+
           console.log("✅ Player initialized successfully");
         } catch (error) {
           console.error("❌ Failed to initialize player:", error);
+
+          // Hide loading elements on error
+          const loadingElement = document.getElementById("loading");
+          if (loadingElement) {
+            loadingElement.style.display = "none";
+          }
 
           // Show error in overlay if available
           const overlay = document.getElementById("plyr-loading-overlay");
@@ -424,106 +467,6 @@
           }
         }
       });
-
-      // Console functionality
-      function initConsole() {
-        const consoleModal = document.getElementById("console-modal");
-        if (!consoleModal) return;
-
-        const consoleClose = document.getElementById("console-close");
-        const consoleLogs = document.getElementById("console-logs");
-        const consoleInput = document.getElementById("console-input");
-        const consoleSend = document.getElementById("console-send");
-
-        // Handle show console IPC message
-        if (window.electronAPI && window.electronAPI.onShowConsoleTab) {
-          window.electronAPI.onShowConsoleTab(() => {
-            showConsole();
-          });
-
-          window.electronAPI.onConsoleLog((event, logData) => {
-            addLogEntry(logData);
-          });
-        }
-
-        function showConsole() {
-          consoleModal.style.display = "flex";
-          loadConsoleLogs();
-        }
-
-        function hideConsole() {
-          consoleModal.style.display = "none";
-        }
-
-        async function loadConsoleLogs() {
-          if (window.electronAPI && window.electronAPI.getConsoleLogs) {
-            try {
-              const logs = await window.electronAPI.getConsoleLogs();
-              consoleLogs.innerHTML = "";
-              logs.forEach((log) => addLogEntry(log));
-              consoleLogs.scrollTop = consoleLogs.scrollHeight;
-            } catch (error) {
-              console.error("Failed to load console logs:", error);
-            }
-          }
-        }
-
-        function addLogEntry(logData) {
-          const entry = document.createElement("div");
-          entry.className = `console-log-entry console-log-${logData.level}`;
-          entry.textContent = `[${new Date(logData.timestamp).toLocaleTimeString()}] ${logData.message}`;
-          consoleLogs.appendChild(entry);
-          consoleLogs.scrollTop = consoleLogs.scrollHeight;
-        }
-
-        async function executeCommand(command) {
-          if (window.electronAPI && window.electronAPI.executeCommand) {
-            try {
-              const result = await window.electronAPI.executeCommand(command);
-              addLogEntry({
-                level: result.success ? "success" : "error",
-                message: `> ${command}\n${result.output}`,
-                timestamp: new Date().toISOString(),
-              });
-            } catch (error) {
-              addLogEntry({
-                level: "error",
-                message: `> ${command}\nError: ${error.message}`,
-                timestamp: new Date().toISOString(),
-              });
-            }
-          }
-        }
-
-        consoleClose.addEventListener("click", hideConsole);
-        consoleModal.addEventListener("click", (e) => {
-          if (e.target === consoleModal) hideConsole();
-        });
-        consoleSend.addEventListener("click", () => {
-          const command = consoleInput.value.trim();
-          if (command) {
-            executeCommand(command);
-            consoleInput.value = "";
-          }
-        });
-        consoleInput.addEventListener("keypress", (e) => {
-          if (e.key === "Enter") {
-            const command = consoleInput.value.trim();
-            if (command) {
-              executeCommand(command);
-              consoleInput.value = "";
-            }
-          }
-        });
-        document.addEventListener("keydown", (e) => {
-          if (e.key === "Escape" && consoleModal.style.display === "flex") {
-            hideConsole();
-          }
-        });
-      }
-
-      // Initialize console
-      setTimeout(initConsole, 100);
     </script>
   </body>
 </html>
