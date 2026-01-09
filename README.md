@@ -650,7 +650,7 @@ npm run build               # Full build with zip
 npm run electron-pack      # Package only (no zip)
 
 # Build outputs
-./out/MKV-Video-Player-win32-x64/     # ZIP'ed
+./out/MKV-Video-Player-win32-x64/     # Package
 ./out/make/                           # Platform-specific zip
 ```
 
