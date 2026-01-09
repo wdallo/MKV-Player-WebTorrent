@@ -96,15 +96,15 @@
 ```
 MKV-Player-WebTorrent/
 │
-├── 📁 app.js                     # Main Express server application
-├── 📁 electron-main.js           # Electron main process (desktop app)
-├── 📁 launcher.js                # Universal launcher (web/desktop/dev)
-├── 📁 package.json               # Dependencies & scripts
-├── 📁 package-lock.json          # Dependency lock file
-├── 📁 favicon.ico                # Application icon
-├── 📁 favicon.png                # Application icon (PNG format)
-├── 📁 .npmrc                     # NPM configuration
-├── 📁 .gitignore                 # Git ignore rules
+├── 📄 app.js                     # Main Express server application
+├── 📄 electron-main.js           # Electron main process (desktop app)
+├── 📄 launcher.js                # Universal launcher (web/desktop/dev)
+├── 📄 package.json               # Dependencies & scripts
+├── 📄 package-lock.json          # Dependency lock file
+├── 📄 favicon.ico                # Application icon
+├── 📄 favicon.png                # Application icon (PNG format)
+├── 📄 .npmrc                     # NPM configuration
+├── 📄 .gitignore                 # Git ignore rules
 │
 ├── 📂 configs/                   # Centralized configuration
 │   └── all.config.js             # PERF_CONFIG and PLAYER_CONFIG exports
@@ -650,7 +650,7 @@ npm run build               # Full build with zip
 npm run electron-pack      # Package only (no zip)
 
 # Build outputs
-./out/MKV-Video-Player-win32-x64/     # Windows executable
+./out/MKV-Video-Player-win32-x64/     # ZIP'ed
 ./out/make/                           # Platform-specific zip
 ```
 
