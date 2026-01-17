@@ -125,7 +125,7 @@ class ChromeResourceManager {
 
         if (CONFIG.DEBUG_MODE) {
           console.log(
-            `[MEMORY] ${memInfo.used}MB / ${memInfo.total}MB (Limit: ${memInfo.limit}MB)`
+            `[MEMORY] ${memInfo.used}MB / ${memInfo.total}MB (Limit: ${memInfo.limit}MB)`,
           );
         }
 
@@ -340,7 +340,7 @@ class UIController {
           this.elements.statusDetails.style.display = "";
         }
       },
-      UI.STATUS_UPDATE_DEBOUNCE
+      UI.STATUS_UPDATE_DEBOUNCE,
     );
   }
 
@@ -660,10 +660,10 @@ class UIController {
     const videoBufferEl = document.getElementById("context-video-buffer");
     const subtitleStatusEl = document.getElementById("context-subtitle-status");
     const subtitleProgressEl = document.getElementById(
-      "context-subtitle-progress"
+      "context-subtitle-progress",
     );
     const downloadProgressEl = document.getElementById(
-      "context-download-progress"
+      "context-download-progress",
     );
 
     if (
@@ -908,7 +908,7 @@ class UIController {
     // Remove any existing listeners
     this.elements.video.removeEventListener(
       "contextmenu",
-      this.videoContextHandler
+      this.videoContextHandler,
     );
 
     // Create bound handler function
@@ -920,14 +920,14 @@ class UIController {
 
     this.elements.video.addEventListener(
       "contextmenu",
-      this.videoContextHandler
+      this.videoContextHandler,
     );
 
     // Also add to video container
     if (this.elements.videoContainer) {
       this.elements.videoContainer.removeEventListener(
         "contextmenu",
-        this.containerContextHandler
+        this.containerContextHandler,
       );
 
       this.containerContextHandler = (e) => {
@@ -946,7 +946,7 @@ class UIController {
 
       this.elements.videoContainer.addEventListener(
         "contextmenu",
-        this.containerContextHandler
+        this.containerContextHandler,
       );
     }
 
@@ -988,7 +988,7 @@ class UIController {
     if (this.videoContextHandler && this.elements.video) {
       this.elements.video.removeEventListener(
         "contextmenu",
-        this.videoContextHandler
+        this.videoContextHandler,
       );
     }
   }
@@ -1014,7 +1014,7 @@ class RetryController {
   getRetryDelay() {
     return Math.min(
       CONFIG.BASE_RETRY_DELAY + this.retryCount * RETRY.DELAY_INCREMENT,
-      CONFIG.MAX_RETRY_DELAY
+      CONFIG.MAX_RETRY_DELAY,
     );
   }
 
@@ -1032,7 +1032,7 @@ class RetryController {
       onStep?.(
         `Retrying video load, attempt ${this.retryCount}/${
           this.maxRetries
-        } (waiting ${delay / 1000}s)`
+        } (waiting ${delay / 1000}s)`,
       );
 
       await this.delay(delay);
@@ -1092,7 +1092,7 @@ class StatusPoller {
       }
       try {
         const response = await fetch(
-          `/status?url=${encodeURIComponent(this.magnetUrl)}`
+          `/status?url=${encodeURIComponent(this.magnetUrl)}`,
         );
 
         if (response.ok) {
@@ -1155,7 +1155,7 @@ class ResourceLoader {
       // Show polling message
       if (window.player && window.player.ui) {
         window.player.ui.setStatusMessage(
-          `Polling for ${isText ? "subtitles" : "video"}... (attempt ${i + 1})`
+          `Polling for ${isText ? "subtitles" : "video"}... (attempt ${i + 1})`,
         );
       }
 
@@ -1229,7 +1229,7 @@ class SubtitlesManager {
   async fetchAvailableTracks() {
     try {
       const response = await fetch(
-        `/subtitle-tracks?url=${encodeURIComponent(this.magnetUrl)}`
+        `/subtitle-tracks?url=${encodeURIComponent(this.magnetUrl)}`,
       );
       if (response.ok) {
         this.availableTracks = await response.json();
@@ -1245,7 +1245,7 @@ class SubtitlesManager {
         if (CONFIG.DEBUG_MODE)
           console.log(
             "[SUBTITLES] Failed to fetch tracks, status:",
-            response.status
+            response.status,
           );
       }
     } catch (error) {
@@ -1465,14 +1465,14 @@ class SubtitlesManager {
       path1.setAttribute("fill", "#ffffffff");
       path1.setAttribute(
         "d",
-        "M14,23H6a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H6a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"
+        "M14,23H6a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H6a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z",
       );
 
       const path2 = document.createElementNS(svgNS, "path");
       path2.setAttribute("fill", "#ffffffff");
       path2.setAttribute(
         "d",
-        "M28,23H20a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H20a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z"
+        "M28,23H20a3,3,0,0,1-3-3V13a3,3,0,0,1,3-3h8a1,1,0,0,1,0,2H20a1,1,0,0,0-1,1v7a1,1,0,0,0,1,1h8a1,1,0,0,1,0,2Z",
       );
 
       g.appendChild(path1);
@@ -1653,7 +1653,7 @@ class SubtitlesManager {
     this.updateSelectorDisplay();
 
     var subtitlesUrl = `/subtitles?url=${encodeURIComponent(
-      this.magnetUrl
+      this.magnetUrl,
     )}&track=${trackIndex}`;
 
     try {
@@ -1767,7 +1767,7 @@ class SubtitlesManager {
     } else {
       console.error("SubtitlesOctopus not loaded!");
       this.ui.showError(
-        "Subtitle engine failed to load. Video will play without subtitles."
+        "Subtitle engine failed to load. Video will play without subtitles.",
       );
       return false;
     }
@@ -1981,7 +1981,7 @@ class VideoPlayerController {
         console.log(`[AUDIO] Sources match: ${sourcesMatch}`);
         if (!sourcesMatch) {
           console.warn(
-            `[AUDIO] Video src mismatch! Expected: ${videoUrl}, Actual: ${video.src}`
+            `[AUDIO] Video src mismatch! Expected: ${videoUrl}, Actual: ${video.src}`,
           );
         }
       }
@@ -2030,7 +2030,7 @@ class VideoPlayerController {
     this.resourceLoader = new ResourceLoader();
     this.subtitlesManager = new SubtitlesManager(
       this.ui.elements.video,
-      magnetUrl
+      magnetUrl,
     );
     this.audioManager = new AudioManager(magnetUrl);
 
@@ -2112,7 +2112,7 @@ class VideoPlayerController {
       // Show user-friendly error
       if (this.ui) {
         this.ui.showError(
-          "An unexpected error occurred. Please refresh the page."
+          "An unexpected error occurred. Please refresh the page.",
         );
       }
     });
@@ -2141,11 +2141,11 @@ class VideoPlayerController {
       if (e.key === this.playerReadyKey && e.newValue === null) {
         if (CONFIG.DEBUG_MODE)
           console.log(
-            "Another tab cleaned up this magnet, cleaning up localStorage"
+            "Another tab cleaned up this magnet, cleaning up localStorage",
           );
         this.clearLocalStorageData();
         this.ui.showError(
-          "Files were deleted from another tab. Please reload."
+          "Files were deleted from another tab. Please reload.",
         );
         this.statusPoller.stop();
       }
@@ -2180,27 +2180,27 @@ class VideoPlayerController {
           console.error("Error in canplay handler:", error);
         }
       },
-      passiveOptions
+      passiveOptions,
     );
     video.addEventListener(
       "loadstart",
       () => this.handleVideoLoadStart(),
-      passiveOptions
+      passiveOptions,
     );
     video.addEventListener(
       "loadedmetadata",
       () => this.handleVideoLoadedMetadata(),
-      passiveOptions
+      passiveOptions,
     );
     video.addEventListener(
       "loadeddata",
       () => this.handleVideoLoadedData(),
-      passiveOptions
+      passiveOptions,
     );
     video.addEventListener(
       "canplaythrough",
       () => this.handleVideoCanPlayThrough(),
-      passiveOptions
+      passiveOptions,
     );
 
     // Debounced timeupdate for better performance
@@ -2229,7 +2229,7 @@ class VideoPlayerController {
           console.warn("Error in timeupdate handler:", error);
         }
       },
-      passiveOptions
+      passiveOptions,
     );
 
     // Cleanup on page leave - multiple events to ensure it triggers (if manual cleanup is enabled)
@@ -2242,15 +2242,15 @@ class VideoPlayerController {
       // Use passive listeners for better performance
       window.addEventListener("beforeunload", cleanupAll, { passive: true });
       window.addEventListener("pagehide", cleanupAll, { passive: true });
-      window.addEventListener("unload", cleanupAll, { passive: true });
+
       if (CONFIG.DEBUG_MODE)
         console.log(
-          "Manual cleanup enabled - files will be deleted when player is closed"
+          "Manual cleanup enabled - files will be deleted when player is closed",
         );
     } else {
       if (CONFIG.DEBUG_MODE)
         console.log(
-          `Manual cleanup disabled - files will auto-delete after ${CONFIG.AUTO_DELETE_HOURS} hours`
+          `Manual cleanup disabled - files will auto-delete after ${CONFIG.AUTO_DELETE_HOURS} hours`,
         );
     }
   }
@@ -2273,7 +2273,7 @@ class VideoPlayerController {
     root.style.setProperty("--plyr-color-main", PLYR_THEME.primaryColor);
     root.style.setProperty(
       "--plyr-video-background",
-      PLYR_THEME.videoBackground
+      PLYR_THEME.videoBackground,
     );
     root.style.setProperty("--plyr-menu-background", PLYR_THEME.menuBackground);
     root.style.setProperty("--plyr-menu-shadow", PLYR_THEME.menuShadow);
@@ -2281,21 +2281,21 @@ class VideoPlayerController {
     root.style.setProperty("--plyr-video-control-color", PLYR_THEME.textColor);
     root.style.setProperty(
       "--plyr-video-control-color-hover",
-      PLYR_THEME.textColor
+      PLYR_THEME.textColor,
     );
     root.style.setProperty(
       "--plyr-video-control-background-hover",
-      PLYR_THEME.controlBackgroundHover
+      PLYR_THEME.controlBackgroundHover,
     );
     root.style.setProperty(
       "--plyr-tooltip-background",
-      PLYR_THEME.tooltipBackground
+      PLYR_THEME.tooltipBackground,
     );
     root.style.setProperty("--plyr-tooltip-color", PLYR_THEME.tooltipColor);
     root.style.setProperty("--plyr-control-icon-size", PLYR_THEME.iconSize);
     root.style.setProperty(
       "--plyr-control-icon-size-large",
-      PLYR_THEME.iconSizeLarge || "24px"
+      PLYR_THEME.iconSizeLarge || "24px",
     );
     root.style.setProperty("--plyr-control-spacing", "8px"); // REDUCED FROM 10px
     root.style.setProperty("--plyr-control-radius", PLYR_THEME.borderRadius);
@@ -2308,27 +2308,27 @@ class VideoPlayerController {
 
     root.style.setProperty(
       "--plyr-range-fill-background",
-      PLYR_THEME.primaryColor
+      PLYR_THEME.primaryColor,
     );
     root.style.setProperty(
       "--plyr-video-progress-buffered-background",
-      PLYR_THEME.bufferColor
+      PLYR_THEME.bufferColor,
     );
     root.style.setProperty(
       "--plyr-range-track-background",
-      PLYR_THEME.sliderTrackColor
+      PLYR_THEME.sliderTrackColor,
     );
     root.style.setProperty(
       "--plyr-video-controls-background",
-      PLYR_THEME.controlBackground
+      PLYR_THEME.controlBackground,
     );
     root.style.setProperty(
       "--plyr-badge-background",
-      PLYR_THEME.badgeBackground
+      PLYR_THEME.badgeBackground,
     );
     root.style.setProperty(
       "--plyr-badge-text-color",
-      PLYR_THEME.badgeTextColor
+      PLYR_THEME.badgeTextColor,
     );
     root.style.setProperty("--plyr-tab-focus-color", PLYR_THEME.focusColor);
     root.style.setProperty("--plyr-font-family", PLYR_THEME.fontFamily);
@@ -2351,7 +2351,7 @@ class VideoPlayerController {
       const createSVGElement = (tag, attributes = {}) => {
         const element = document.createElementNS(
           "http://www.w3.org/2000/svg",
-          tag
+          tag,
         );
         Object.entries(attributes).forEach(([key, value]) => {
           element.setAttribute(key, value);
@@ -2573,7 +2573,7 @@ class VideoPlayerController {
       // Load resources
       const videoUrl = `/video?url=${encodeURIComponent(this.magnetUrl)}`;
       const subtitlesUrl = `/subtitles?url=${encodeURIComponent(
-        this.magnetUrl
+        this.magnetUrl,
       )}`;
       this.ui.showStep("Loading video and subtitles...");
 
@@ -2618,7 +2618,7 @@ class VideoPlayerController {
         } catch (error) {
           console.error("Failed to initialize Plyr:", error);
           this.ui.showError(
-            `Failed to initialize video player: ${error.message}`
+            `Failed to initialize video player: ${error.message}`,
           );
           throw error;
         }
@@ -2683,7 +2683,7 @@ class VideoPlayerController {
         this.subtitlesLoaded = false;
         this.subtitlesManager.currentTrack = null;
         this.ui.showStep(
-          "Subtitles not ready yet, will try again when video is ready"
+          "Subtitles not ready yet, will try again when video is ready",
         );
       }
 
@@ -2726,11 +2726,11 @@ class VideoPlayerController {
         if (data.fileDeleted) {
           if (CONFIG.DEBUG_MODE)
             console.log(
-              "File was deleted externally, cleaning up localStorage"
+              "File was deleted externally, cleaning up localStorage",
             );
           this.clearLocalStorageData();
           this.ui.showError(
-            "Video file was deleted. Please reload with a new torrent."
+            "Video file was deleted. Please reload with a new torrent.",
           );
           this.statusPoller.stop();
           return;
@@ -2772,7 +2772,7 @@ class VideoPlayerController {
           } catch (storageError) {
             console.warn(
               "Failed to set localStorage ready flag:",
-              storageError
+              storageError,
             );
             this.ui.hideLoading(); // Still hide loading even if storage fails
           }
@@ -2792,7 +2792,7 @@ class VideoPlayerController {
       }
       // Prevent cascading errors
       this.ui.showError(
-        "An error occurred during status update. Please refresh."
+        "An error occurred during status update. Please refresh.",
       );
     }
   }
@@ -2813,7 +2813,7 @@ class VideoPlayerController {
 
     this.retryController.executeRetry(
       () => this.ui.elements.video.load(),
-      (message) => this.ui.showStep(message)
+      (message) => this.ui.showStep(message),
     );
   }
 
@@ -2833,7 +2833,7 @@ class VideoPlayerController {
       // Fetch available tracks first, then load the first one
       this.subtitlesManager.fetchAvailableTracks().then(() => {
         const subtitlesUrl = `/subtitles?url=${encodeURIComponent(
-          this.magnetUrl
+          this.magnetUrl,
         )}&track=0`;
         // Add timestamp to bypass cache
         const urlWithTimestamp = subtitlesUrl + "&_t=" + Date.now();
@@ -2887,7 +2887,7 @@ class VideoPlayerController {
         if (CONFIG.DEBUG_MODE)
           console.log(
             "[AUDIO] Stored original duration:",
-            this.originalDuration
+            this.originalDuration,
           );
       }
 
@@ -2917,7 +2917,7 @@ class VideoPlayerController {
                     this.originalDuration,
                     "previous:",
                     this.previousDuration,
-                    ")"
+                    ")",
                   );
               }
             } catch (e) {
@@ -2962,7 +2962,7 @@ class VideoPlayerController {
     // Update duration display for streaming/infinite videos
     const duration = this.ui.elements.video.duration;
     const durationDisplay = document.querySelector(
-      ".plyr__time--duration, .plyr__duration"
+      ".plyr__time--duration, .plyr__duration",
     );
     let durationToShow = duration;
     if (!isFinite(durationToShow) || isNaN(durationToShow)) {
@@ -3072,7 +3072,7 @@ class VideoPlayerController {
     if (CONFIG.DEBUG_MODE)
       console.log(
         "Manual cleanup enabled - sending goodbye beacon for:",
-        this.magnetUrl
+        this.magnetUrl,
       );
     this.statusPoller.stop();
     this.retryController.clearContinuousRetry();
@@ -3121,7 +3121,7 @@ class VideoPlayerController {
               if (CONFIG.DEBUG_MODE)
                 console.log(
                   "Server requested localStorage cleanup for:",
-                  response.magnet
+                  response.magnet,
                 );
               this.clearLocalStorageData();
             }
@@ -3255,7 +3255,7 @@ class VideoPlayerController {
               console.warn(
                 "Subtitle status check timed out after",
                 maxWaitTime,
-                "ms"
+                "ms",
               );
             }
             resolve(false); // Resolve with false instead of rejecting to continue gracefully
@@ -3338,7 +3338,7 @@ class VideoPlayerController {
           ) {
             if (CONFIG.DEBUG_MODE) {
               console.log(
-                "Subtitles detected but not ready yet, continuing to wait..."
+                "Subtitles detected but not ready yet, continuing to wait...",
               );
             }
           }
@@ -3367,7 +3367,7 @@ class FullscreenController {
     this.watermark = document.querySelector(".video-watermark");
     this.resumeModule = document.getElementById("resume-module");
     this.subtitleSelector = document.getElementById(
-      "subtitle-selector-container"
+      "subtitle-selector-container",
     );
     this.bindEvents();
   }
@@ -3385,7 +3385,7 @@ class FullscreenController {
 
     // Dynamically get current elements (they may be created after constructor)
     this.subtitleSelector = document.getElementById(
-      "subtitle-selector-container"
+      "subtitle-selector-container",
     );
 
     // Track if elements were open before fullscreen
@@ -3523,7 +3523,7 @@ window.cleanLocalStorageForMagnet = function (magnetUrl) {
     if (CONFIG.DEBUG_MODE)
       console.log(
         `Cleaned ${removedKeys.length} localStorage keys for magnet:`,
-        magnetUrl
+        magnetUrl,
       );
     if (CONFIG.DEBUG_MODE) console.log("Removed keys:", removedKeys);
     if (CONFIG.DEBUG_MODE) console.log("=== GLOBAL CLEANUP COMPLETE ===");
@@ -3553,7 +3553,7 @@ window.notifyMagnetDeleted = function (magnetUrl) {
   // If we have an active player for this magnet, show error and stop
   if (window.player && window.player.magnetUrl === magnetUrl) {
     window.player.ui.showError(
-      "Files were deleted. Please reload with a new torrent."
+      "Files were deleted. Please reload with a new torrent.",
     );
     window.player.statusPoller.stop();
   }
@@ -3656,7 +3656,7 @@ class AudioManager {
       ) {
         if (CONFIG.DEBUG_MODE) {
           console.warn(
-            "Audio manager: No multi audio tracks found, skipping initialization."
+            "Audio manager: No multi audio tracks found, skipping initialization.",
           );
         }
         this.initialized = false;
@@ -3665,7 +3665,7 @@ class AudioManager {
       this.initialized = true;
       if (CONFIG.DEBUG_MODE) {
         console.log(
-          `Audio manager initialized with ${this.availableTracks.length} tracks`
+          `Audio manager initialized with ${this.availableTracks.length} tracks`,
         );
       }
     } catch (error) {
@@ -3680,7 +3680,7 @@ class AudioManager {
   async fetchAvailableTracks() {
     try {
       const response = await fetch(
-        `/audio-tracks?url=${encodeURIComponent(this.magnetUrl)}`
+        `/audio-tracks?url=${encodeURIComponent(this.magnetUrl)}`,
       );
       const text = await response.text();
 
@@ -3732,7 +3732,7 @@ class AudioManager {
     const micPath = document.createElementNS(svgNS, "path");
     micPath.setAttribute(
       "d",
-      "M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.93V21h2v-2.07c3.39-.5 6-3.4 6-6.93h-2z"
+      "M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.93V21h2v-2.07c3.39-.5 6-3.4 6-6.93h-2z",
     );
     micPath.setAttribute("fill", "currentColor");
     micIcon.appendChild(micPath);
@@ -3870,17 +3870,17 @@ class AudioManager {
 
       if (CONFIG.DEBUG_MODE) {
         console.log(
-          `[AUDIO] Switching from track ${this.currentTrack} to track ${trackIndex}`
+          `[AUDIO] Switching from track ${this.currentTrack} to track ${trackIndex}`,
         );
         console.log(
-          `[AUDIO] Current time: ${currentTime}, was playing: ${wasPlaying}`
+          `[AUDIO] Current time: ${currentTime}, was playing: ${wasPlaying}`,
         );
         console.log(`[AUDIO] Old source: ${oldSrc}`);
       }
 
       // Update video source to use new audio track
       const newSrc = `/video?url=${encodeURIComponent(
-        this.magnetUrl
+        this.magnetUrl,
       )}&audioTrack=${trackIndex}`;
 
       if (CONFIG.DEBUG_MODE) {
@@ -3890,7 +3890,7 @@ class AudioManager {
       // Test if the new source is actually different and valid
       if (oldSrc === newSrc) {
         console.warn(
-          `[AUDIO] Source URL is the same, audio track might not be changing`
+          `[AUDIO] Source URL is the same, audio track might not be changing`,
         );
       }
 
@@ -3986,7 +3986,7 @@ class AudioManager {
               this.updateAudioTrackMetadata(trackIndex, trackInfo);
             } else {
               console.warn(
-                "[AUDIO] updateAudioTrackMetadata method not available, skipping metadata UI update"
+                "[AUDIO] updateAudioTrackMetadata method not available, skipping metadata UI update",
               );
             }
           }
@@ -4011,7 +4011,7 @@ class AudioManager {
                 trackIndex: trackIndex,
                 trackInfo: this.availableTracks?.[trackIndex],
               },
-            })
+            }),
           );
         };
 
@@ -4044,7 +4044,7 @@ class AudioManager {
         // Verify the switch actually worked
         setTimeout(() => {
           console.log(
-            `[AUDIO] Final verification - Current source: ${video.src}`
+            `[AUDIO] Final verification - Current source: ${video.src}`,
           );
           console.log(`[AUDIO] Expected source: ${newSrc}`);
           console.log(`[AUDIO] Sources match: ${video.src === newSrc}`);
@@ -4062,7 +4062,7 @@ class AudioManager {
       setTimeout(() => {
         if (loadingOverlay && loadingOverlay.style.display !== "none") {
           console.warn(
-            `[AUDIO] Timeout waiting for canplay event, forcing restore`
+            `[AUDIO] Timeout waiting for canplay event, forcing restore`,
           );
           restorePlayback();
         }
@@ -4075,7 +4075,7 @@ class AudioManager {
         console.log(
           `[AUDIO] Track switch initiated to: ${
             this.availableTracks[trackIndex]?.title || trackIndex
-          }`
+          }`,
         );
       }
     } catch (error) {
@@ -4111,7 +4111,7 @@ class AudioManager {
   removeAudioSelector() {
     const existingBtn = document.getElementById("audio-switch-btn");
     const existingSelector = document.getElementById(
-      "audio-selector-container"
+      "audio-selector-container",
     );
     if (existingBtn) existingBtn.remove();
     if (existingSelector) existingSelector.remove();
@@ -4188,7 +4188,7 @@ class AudioManager {
 
         if (CONFIG.DEBUG_MODE) {
           console.log(
-            `[AUDIO] Updated audio track metadata: ${trackDisplayInfo}`
+            `[AUDIO] Updated audio track metadata: ${trackDisplayInfo}`,
           );
         }
       }
@@ -4203,7 +4203,7 @@ class AudioManager {
 
       // Update any audio track indicators in the UI
       const audioIndicators = document.querySelectorAll(
-        ".audio-track-indicator"
+        ".audio-track-indicator",
       );
       audioIndicators.forEach((indicator) => {
         if (trackInfo) {

@@ -132,13 +132,13 @@
           }
 
           const magnetUrl = decodeURIComponent(
-            "<%- encodeURIComponent(magnet) %>"
+            "<%- encodeURIComponent(magnet) %>",
           );
           const embedInput = document.getElementById("embed-code");
           embedInput.value = `<iframe src="${
             window.location.origin
           }/embed?url=${encodeURIComponent(
-            magnetUrl
+            magnetUrl,
           )}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
 
           // Add click handler for embed input selection
@@ -163,7 +163,7 @@
       document.addEventListener("DOMContentLoaded", async () => {
         try {
           const magnetUrl = decodeURIComponent(
-            "<%- encodeURIComponent(magnet) %>"
+            "<%- encodeURIComponent(magnet) %>",
           );
 
           if (!magnetUrl) {
@@ -221,7 +221,7 @@
 
               if (attemptCount > 1) {
                 updateLoadingMessage(
-                  `Checking for subtitles... (attempt ${attemptCount}/${maxAttempts})`
+                  `Checking for subtitles... (attempt ${attemptCount}/${maxAttempts})`,
                 );
                 // Ensure overlay stays visible during retry
                 if (overlay) {
@@ -241,7 +241,7 @@
 
             if (subtitlesAvailable) {
               updateLoadingMessage(
-                "Subtitles found, loading SubtitlesOctopus..."
+                "Subtitles found, loading SubtitlesOctopus...",
               );
 
               // Ensure overlay stays visible during SubtitlesOctopus loading
@@ -277,10 +277,10 @@
               await new Promise((resolve) => setTimeout(resolve, 1000));
             } else {
               console.log(
-                `No subtitles available after ${maxAttempts} attempts`
+                `No subtitles available after ${maxAttempts} attempts`,
               );
               updateLoadingMessage(
-                "No subtitles found, proceeding without subtitles..."
+                "No subtitles found, proceeding without subtitles...",
               );
               // Give a moment for the message to be seen
               await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -309,7 +309,7 @@
 
               if (audioAttemptCount > 1) {
                 updateLoadingMessage(
-                  `Checking for audio tracks... (attempt ${audioAttemptCount}/${maxAudioAttempts})`
+                  `Checking for audio tracks... (attempt ${audioAttemptCount}/${maxAudioAttempts})`,
                 );
                 // Ensure overlay stays visible during retry
                 if (overlay) {
@@ -327,7 +327,7 @@
               } catch (error) {
                 console.log(
                   `Audio track check attempt ${audioAttemptCount} failed:`,
-                  error
+                  error,
                 );
               }
 
@@ -344,10 +344,10 @@
               await new Promise((resolve) => setTimeout(resolve, 1000));
             } else {
               console.log(
-                `No multi audio tracks available after ${maxAudioAttempts} attempts`
+                `No multi audio tracks available after ${maxAudioAttempts} attempts`,
               );
               updateLoadingMessage(
-                "Single audio track detected, proceeding..."
+                "Single audio track detected, proceeding...",
               );
               // Give a moment for the message to be seen
               await new Promise((resolve) => setTimeout(resolve, 1000));
