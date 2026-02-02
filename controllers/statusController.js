@@ -1,5 +1,5 @@
 // Torrent status controller
-import { getOrAddTorrent } from "../services/torrentService.js";
+import { torrentService } from "../services/torrentService.js";
 
 // Helper function to format bytes
 function formatBytes(bytes, decimals = 2) {
@@ -12,12 +12,28 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 // Returns the status of a torrent given a magnet link
-export function getStatus(req, res) {
+export async function getStatus(req, res) {
   const magnet = req.query.url;
   if (!magnet) return res.status(400).json({ error: "Missing url param" });
 
-  // Get or add the torrent to the client
-  const state = getOrAddTorrent(magnet);
+  // Get or add the torrent to the client with error handling
+  let state;
+  try {
+    state = await torrentService.getOrAddTorrent(magnet);
+  } catch (error) {
+    console.error("Error getting torrent for status:", error.message);
+    // Return initializing status instead of 503 error to prevent breaking the frontend
+    return res.json({
+      status: "initializing",
+      progress: 0,
+      downloaded: 0,
+      downloadSpeed: 0,
+      numPeers: 0,
+      length: 0,
+      message: "Torrent service is initializing...",
+    });
+  }
+
   if (!state || !state.torrent) {
     return res.status(404).json({ error: "Torrent not found" });
   }
@@ -34,18 +50,28 @@ export function getStatus(req, res) {
 
   const t = state.torrent;
   let status = "unknown";
+
   // Determine torrent status
-  if (!t.metadata) {
+  // If videoFile exists and has enough data, don't show peer warnings
+  if (state.videoFile && state.videoFile.downloaded > 0) {
+    if (t.done) {
+      status = "done";
+    } else if (t.numPeers === 0 && t.downloaded < 1024 * 1024) {
+      // Only show "no peers" if very little downloaded
+      status = "no peers";
+    } else {
+      status = "downloading";
+    }
+  } else if (!t.ready && !t.metadata) {
     status = "fetching metadata";
   } else if (t.numPeers === 0) {
     status = "no peers";
   } else if (t.downloaded === 0) {
     status = "connecting";
-  } else if (t.done) {
-    status = "done";
   } else {
     status = "downloading";
   }
+
   // Respond with torrent status and stats
   res.json({
     status,

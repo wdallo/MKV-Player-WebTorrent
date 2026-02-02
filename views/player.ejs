@@ -9,6 +9,17 @@
     <link rel="stylesheet" href="/libs/styles/plyr.css" />
     <link rel="stylesheet" href="/libs/styles/style.css" />
 
+    <style>
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+
     <script src="/libs/octopus/subtitles-octopus.js"></script>
   </head>
   <body>
@@ -47,13 +58,10 @@
 
       <!-- Video Player Section -->
       <section id="video-container" class="video-container-main">
-        <div id="plyr-loading-overlay" class="plyr-loading-overlay">
-          <div style="text-align: center">
-            <div class="plyr-spinner"></div>
-            <div class="plyr-loading-text">Loading video player...</div>
-          </div>
-        </div>
         <div class="video-container-tag">
+          <!-- Loading Overlay -->
+          <div id="overlay"></div>
+
           <video
             id="player"
             class="hidden-until-plyr video-player-tag"
@@ -132,13 +140,13 @@
           }
 
           const magnetUrl = decodeURIComponent(
-            "<%- encodeURIComponent(magnet) %>"
+            "<%- encodeURIComponent(magnet) %>",
           );
           const embedInput = document.getElementById("embed-code");
           embedInput.value = `<iframe src="${
             window.location.origin
           }/embed?url=${encodeURIComponent(
-            magnetUrl
+            magnetUrl,
           )}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
 
           // Add click handler for embed input selection
@@ -163,7 +171,7 @@
       document.addEventListener("DOMContentLoaded", async () => {
         try {
           const magnetUrl = decodeURIComponent(
-            "<%- encodeURIComponent(magnet) %>"
+            "<%- encodeURIComponent(magnet) %>",
           );
 
           if (!magnetUrl) {
@@ -173,253 +181,12 @@
 
           console.log("Initializing player with magnet:", magnetUrl);
 
-          // Get loading elements
-          const loadingElement = document.getElementById("loading");
-          const overlay = document.getElementById("plyr-loading-overlay");
-          const plyrLoadingText = overlay?.querySelector(".plyr-loading-text");
-
-          // Function to update loading message
-          function updateLoadingMessage(message) {
-            if (loadingElement) {
-              loadingElement.style.display = "block";
-              loadingElement.textContent = message;
-            }
-            if (plyrLoadingText) {
-              plyrLoadingText.textContent = message;
-            }
-            if (overlay) {
-              overlay.style.display = "flex";
-            }
-          }
-
-          updateLoadingMessage("Loading video player...");
-
+          // Initialize player - it will use its own overlay manager
           const player = new VideoPlayerController(magnetUrl);
-
-          // Make player globally accessible for context menu and debugging
           window.player = player;
-
-          // Initialize with error handling
           await player.initialize();
-
-          // Check if subtitles exist and wait for SubtitlesOctopus to be ready
-          if (player.subtitlesManager) {
-            updateLoadingMessage("Checking for subtitles...");
-
-            // Ensure overlay stays visible during subtitle checking
-            if (overlay) {
-              overlay.style.display = "flex";
-            }
-
-            // Try to find subtitles with retry logic (max 3 attempts)
-            let subtitlesAvailable = false;
-            let attemptCount = 0;
-            const maxAttempts = 3;
-
-            while (attemptCount < maxAttempts && !subtitlesAvailable) {
-              attemptCount++;
-
-              if (attemptCount > 1) {
-                updateLoadingMessage(
-                  `Checking for subtitles... (attempt ${attemptCount}/${maxAttempts})`
-                );
-                // Ensure overlay stays visible during retry
-                if (overlay) {
-                  overlay.style.display = "flex";
-                }
-                // Wait a bit before retrying
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-              }
-
-              subtitlesAvailable = await player.checkSubtitlesAvailable();
-
-              // Keep overlay visible after checking
-              if (overlay) {
-                overlay.style.display = "flex";
-              }
-            }
-
-            if (subtitlesAvailable) {
-              updateLoadingMessage(
-                "Subtitles found, loading SubtitlesOctopus..."
-              );
-
-              // Ensure overlay stays visible during SubtitlesOctopus loading
-              if (overlay) {
-                overlay.style.display = "flex";
-              }
-
-              // Wait specifically for SubtitlesOctopus to be ready
-              const waitForOctopus = async () => {
-                return new Promise((resolve) => {
-                  const checkOctopus = () => {
-                    // Keep overlay visible during checks
-                    if (overlay) {
-                      overlay.style.display = "flex";
-                    }
-
-                    const subtitles = player.subtitlesManager;
-                    if (subtitles && subtitles.octopusReady) {
-                      console.log("✅ SubtitlesOctopus is ready!");
-                      resolve(true);
-                    } else {
-                      setTimeout(checkOctopus, 500);
-                    }
-                  };
-                  checkOctopus();
-                });
-              };
-
-              await waitForOctopus();
-              updateLoadingMessage("SubtitlesOctopus loaded successfully!");
-
-              // Give a moment for the message to be seen
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            } else {
-              console.log(
-                `No subtitles available after ${maxAttempts} attempts`
-              );
-              updateLoadingMessage(
-                "No subtitles found, proceeding without subtitles..."
-              );
-              // Give a moment for the message to be seen
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-          }
-
-          // Check if multi audio tracks exist with retry logic
-          if (player.audioManager) {
-            updateLoadingMessage("Checking for audio tracks...");
-
-            // Ensure overlay stays visible during audio checking
-            if (overlay) {
-              overlay.style.display = "flex";
-            }
-
-            // Try to find audio tracks with retry logic (max 3 attempts)
-            let audioTracksAvailable = false;
-            let audioAttemptCount = 0;
-            const maxAudioAttempts = 3;
-
-            while (
-              audioAttemptCount < maxAudioAttempts &&
-              !audioTracksAvailable
-            ) {
-              audioAttemptCount++;
-
-              if (audioAttemptCount > 1) {
-                updateLoadingMessage(
-                  `Checking for audio tracks... (attempt ${audioAttemptCount}/${maxAudioAttempts})`
-                );
-                // Ensure overlay stays visible during retry
-                if (overlay) {
-                  overlay.style.display = "flex";
-                }
-                // Wait a bit before retrying
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-              }
-
-              // Check if audio manager has multiple tracks available
-              try {
-                await player.audioManager.initialize();
-                const audioTracks = player.audioManager.availableTracks || [];
-                audioTracksAvailable = audioTracks.length > 1; // Multiple tracks available
-              } catch (error) {
-                console.log(
-                  `Audio track check attempt ${audioAttemptCount} failed:`,
-                  error
-                );
-              }
-
-              // Keep overlay visible after checking
-              if (overlay) {
-                overlay.style.display = "flex";
-              }
-            }
-
-            if (audioTracksAvailable) {
-              updateLoadingMessage("Multi audio tracks found!");
-              console.log("✅ Multi audio tracks are available");
-              // Give a moment for the message to be seen
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            } else {
-              console.log(
-                `No multi audio tracks available after ${maxAudioAttempts} attempts`
-              );
-              updateLoadingMessage(
-                "Single audio track detected, proceeding..."
-              );
-              // Give a moment for the message to be seen
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-          }
-
-          // Hide loading indicators now
-          if (loadingElement) {
-            loadingElement.style.display = "none";
-          }
-          if (overlay) {
-            overlay.style.display = "none";
-          }
-
-          console.log("✅ Player initialized successfully");
         } catch (error) {
           console.error("❌ Failed to initialize player:", error);
-
-          // Hide loading elements on error
-          const loadingElement = document.getElementById("loading");
-          if (loadingElement) {
-            loadingElement.style.display = "none";
-          }
-
-          // Show error in overlay if available
-          const overlay = document.getElementById("plyr-loading-overlay");
-          if (overlay) {
-            // Clear existing content safely
-            overlay.textContent = "";
-
-            // Create error container
-            const errorContainer = document.createElement("div");
-            errorContainer.style.textAlign = "center";
-            errorContainer.style.color = "#fff";
-            errorContainer.style.padding = "20px";
-
-            // Create icon
-            const iconDiv = document.createElement("div");
-            iconDiv.textContent = "⚠️";
-            iconDiv.style.fontSize = "2em";
-            iconDiv.style.marginBottom = "10px";
-
-            // Create title
-            const titleDiv = document.createElement("div");
-            titleDiv.textContent = "Player Error";
-            titleDiv.style.fontSize = "1.2em";
-            titleDiv.style.marginBottom = "10px";
-
-            // Create message
-            const messageDiv = document.createElement("div");
-            messageDiv.textContent = error.message || "Unknown error occurred";
-            messageDiv.style.opacity = "0.8";
-
-            // Create retry button
-            const retryButton = document.createElement("button");
-            retryButton.textContent = "Retry";
-            retryButton.style.marginTop = "15px";
-            retryButton.style.padding = "8px 16px";
-            retryButton.style.background = "#007bff";
-            retryButton.style.color = "white";
-            retryButton.style.border = "none";
-            retryButton.style.borderRadius = "4px";
-            retryButton.style.cursor = "pointer";
-            retryButton.addEventListener("click", () => location.reload());
-
-            // Assemble the error display
-            errorContainer.appendChild(iconDiv);
-            errorContainer.appendChild(titleDiv);
-            errorContainer.appendChild(messageDiv);
-            errorContainer.appendChild(retryButton);
-            overlay.appendChild(errorContainer);
-          }
         }
       });
     </script>

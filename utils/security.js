@@ -1,42 +1,44 @@
-// Security middleware and utilities for the MKV Player WebTorrent application
+/**
+ * Enhanced security middleware and utilities
+ * Provides comprehensive security features for the application
+ */
+
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { SECURITY_CONFIG, ENV } from "../configs/environment.config.js";
+import { createLogger } from "./logger.js";
+import { sanitizeString, isValidMagnet } from "./validator.js";
 
-// Constants
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
-const RATE_LIMIT_STREAMING = 10000;
-const RATE_LIMIT_POLLING = 5000;
-const RATE_LIMIT_PAGES = 100;
-const RATE_LIMIT_DEFAULT = 500;
-const MAX_INPUT_LENGTH = 1000;
+const logger = createLogger("SECURITY");
 
-// Smart rate limiting for streaming applications
+/**
+ * Smart rate limiting for streaming applications
+ */
 export const rateLimiter = rateLimit({
-  windowMs: RATE_LIMIT_WINDOW,
-  max: async (req) => {
+  windowMs: SECURITY_CONFIG.RATE_LIMIT_WINDOW,
+  max: (req) => {
     // Different limits based on endpoint type
     if (req.url.includes("/video") || req.url.includes("/audio")) {
-      return RATE_LIMIT_STREAMING; // Very high limit for media streaming
+      return SECURITY_CONFIG.RATE_LIMIT_STREAMING;
     }
     if (
       req.url.includes("/subtitles") ||
       req.url.includes("/status") ||
       req.url.includes("/health")
     ) {
-      return RATE_LIMIT_POLLING; // High limit for frequent polling endpoints
+      return SECURITY_CONFIG.RATE_LIMIT_POLLING;
     }
     if (req.url.includes("/player") || req.url.includes("/embed")) {
-      return RATE_LIMIT_PAGES; // Normal limit for page loads
+      return SECURITY_CONFIG.RATE_LIMIT_PAGES;
     }
-    return RATE_LIMIT_DEFAULT; // Default moderate limit
+    return SECURITY_CONFIG.RATE_LIMIT_DEFAULT;
   },
   message: {
     error: "Rate limit exceeded. Please wait before making more requests.",
     retryAfter: 60,
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  // Skip rate limiting for localhost and development
+  standardHeaders: true,
+  legacyHeaders: false,
   skip: (req) => {
     const isLocalhost =
       req.ip === "::1" ||
@@ -44,152 +46,107 @@ export const rateLimiter = rateLimit({
       req.ip === "::ffff:127.0.0.1" ||
       req.hostname === "localhost";
 
-    const isDevelopment =
-      process.env.NODE_ENV === "development" ||
-      process.env.NODE_ENV === "electron";
-    const isElectron =
-      typeof process !== "undefined" &&
-      process.versions &&
-      process.versions.electron;
-
-    // Skip for localhost, development, or Electron environment
-    return isLocalhost || isDevelopment || isElectron;
+    return isLocalhost || ENV.IS_DEVELOPMENT || ENV.IS_ELECTRON;
   },
-  // Don't count failed requests against limit
   skipFailedRequests: true,
+  handler: (req, res) => {
+    logger.warn("Rate limit exceeded", {
+      ip: req.ip,
+      url: req.url,
+      method: req.method,
+    });
+    res.status(429).json({
+      error: "Too many requests",
+      message: "Please wait before making more requests",
+      retryAfter: 60,
+    });
+  },
 });
 
-// Security headers middleware
+/**
+ * Enhanced security headers middleware
+ */
 export const securityHeaders = helmet({
   contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-        "'unsafe-hashes'",
-        "https://cdn.jsdelivr.net",
-        "https://cdn.plyr.io/",
-      ],
-      scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      mediaSrc: ["'self'", "blob:"],
-      connectSrc: [
-        "'self'",
-        "ws:",
-        "wss:",
-        "https://cdn.jsdelivr.net",
-        "https://cdn.plyr.io/",
-      ],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-    },
+    directives: SECURITY_CONFIG.CSP_DIRECTIVES,
   },
-  crossOriginEmbedderPolicy: false, // Disable for WebTorrent compatibility
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true,
   },
+  noSniff: true,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  xssFilter: true,
 });
 
-// Input sanitization utilities
-export function sanitizeInput(input) {
-  if (typeof input !== "string") {
-    return "";
-  }
-
-  return input
-    .trim()
-    .replace(/[<>\"'&]/g, "") // Remove potentially dangerous characters
-    .substring(0, MAX_INPUT_LENGTH);
-}
-
-// Validate file paths to prevent directory traversal
-export function isValidPath(filePath) {
-  if (typeof filePath !== "string") {
-    return false;
-  }
-
-  // Check for directory traversal attempts
-  if (filePath.includes("..") || filePath.includes("~")) {
-    return false;
-  }
-
-  // Check for absolute paths
-  if (filePath.startsWith("/") || /^[A-Za-z]:/.test(filePath)) {
-    return false;
-  }
-
-  return true;
-}
-
-// Validate magnet URLs with enhanced security
-export function validateMagnetURL(url) {
+/**
+ * Input sanitization middleware
+ */
+export function sanitizeInputs(req, res, next) {
   try {
-    if (!url || typeof url !== "string") {
-      return { valid: false, error: "Invalid URL type" };
+    // Sanitize query parameters
+    if (req.query) {
+      Object.keys(req.query).forEach((key) => {
+        if (typeof req.query[key] === "string") {
+          req.query[key] = sanitizeString(req.query[key]);
+        }
+      });
     }
 
-    // Length validation
-    if (url.length > 2048) {
-      return { valid: false, error: "URL too long" };
+    // Sanitize body parameters
+    if (req.body && typeof req.body === "object") {
+      Object.keys(req.body).forEach((key) => {
+        if (typeof req.body[key] === "string") {
+          req.body[key] = sanitizeString(req.body[key]);
+        }
+      });
     }
 
-    // Basic magnet format validation
-    if (!url.startsWith("magnet:?xt=urn:btih:")) {
-      return { valid: false, error: "Invalid magnet format" };
-    }
-
-    // Check for suspicious patterns
-    const suspiciousPatterns = [
-      /javascript:/i,
-      /data:/i,
-      /vbscript:/i,
-      /<script/i,
-      /on\w+=/i,
-    ];
-
-    for (const pattern of suspiciousPatterns) {
-      if (pattern.test(url)) {
-        return { valid: false, error: "Suspicious content detected" };
-      }
-    }
-
-    return { valid: true };
+    next();
   } catch (error) {
-    return { valid: false, error: "Validation error" };
+    logger.error("Error sanitizing inputs", error);
+    next(error);
   }
 }
 
-// Error handling middleware
-export function errorHandler(err, req, res, next) {
-  // Log error for monitoring
-  console.error("Security Error:", {
-    message: err.message,
-    stack: err.stack,
-    ip: req.ip,
-    userAgent: req.get("User-Agent"),
-    timestamp: new Date().toISOString(),
-  });
+/**
+ * Request timeout middleware
+ */
+export function requestTimeout(timeout = SECURITY_CONFIG.REQUEST_TIMEOUT) {
+  return (req, res, next) => {
+    // Skip timeout for streaming endpoints
+    if (req.url.includes("/video") || req.url.includes("/audio")) {
+      return next();
+    }
 
-  // Don't leak error details in production
-  const isDevelopment =
-    process.env.NODE_ENV === "development" ||
-    process.env.NODE_ENV === "electron";
+    const timer = setTimeout(() => {
+      logger.warn("Request timeout", {
+        url: req.url,
+        method: req.method,
+        ip: req.ip,
+      });
 
-  res.status(err.status || 500).json({
-    error: isDevelopment ? err.message : "Internal Server Error",
-    ...(isDevelopment && { stack: err.stack }),
-  });
+      if (!res.headersSent) {
+        res.status(408).json({
+          error: "Request timeout",
+          message: "The request took too long to process",
+        });
+      }
+    }, timeout);
+
+    res.on("finish", () => clearTimeout(timer));
+    res.on("close", () => clearTimeout(timer));
+
+    next();
+  };
 }
 
-// Request logging middleware for security monitoring
+/**
+ * Enhanced security logger middleware
+ */
 export function securityLogger(req, res, next) {
   const startTime = Date.now();
 
@@ -201,30 +158,127 @@ export function securityLogger(req, res, next) {
       url: req.url,
       status: res.statusCode,
       duration,
-      userAgent: req.get("User-Agent"),
-      timestamp: new Date().toISOString(),
     };
 
-    // Log suspicious activity, but exclude legitimate requests
-    const isHealthCheck = req.url === "/health" || req.url === "/";
+    // Log based on status and conditions
+    const isHealthCheck = req.url === "/health" || req.url === "/status";
     const isLocalhost =
       req.ip === "::1" ||
       req.ip === "127.0.0.1" ||
       req.ip === "::ffff:127.0.0.1";
-    const isElectronAgent =
-      req.get("User-Agent")?.includes("electron") ||
-      req.get("User-Agent") === "node";
 
-    // Don't flag health checks from localhost/Electron as suspicious
-    const shouldLog =
-      (res.statusCode >= 400 || duration > 10000) &&
-      !(isHealthCheck && isLocalhost) &&
-      !(isElectronAgent && isLocalhost);
-
-    if (shouldLog) {
-      console.warn("Suspicious Activity:", logData);
+    // Log errors or slow requests
+    if (res.statusCode >= 400) {
+      logger.warn("Request failed", logData);
+    } else if (duration > 10000 && !(isHealthCheck && isLocalhost)) {
+      logger.warn("Slow request detected", logData);
     }
   });
 
   next();
+}
+
+/**
+ * Enhanced error handler middleware
+ */
+export function errorHandler(err, req, res, next) {
+  // Log error with context
+  logger.error("Request error", {
+    message: err.message,
+    stack: ENV.IS_DEVELOPMENT ? err.stack : undefined,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+  });
+
+  // Determine status code
+  const statusCode = err.statusCode || err.status || 500;
+
+  // Send appropriate error response
+  res.status(statusCode).json({
+    error: ENV.IS_DEVELOPMENT ? err.message : "Internal Server Error",
+    ...(ENV.IS_DEVELOPMENT && { stack: err.stack }),
+    ...(err.details && { details: err.details }),
+  });
+}
+
+/**
+ * Not found handler
+ */
+export function notFoundHandler(req, res) {
+  logger.warn("Route not found", {
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+  });
+
+  res.status(404).json({
+    error: "Not Found",
+    message: "The requested resource was not found",
+    path: req.url,
+  });
+}
+
+/**
+ * Async error wrapper
+ */
+export function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+/**
+ * Validate magnet URL middleware
+ */
+export function validateMagnet(req, res, next) {
+  const magnet = req.query.url || req.body.url;
+
+  if (!magnet) {
+    return res.status(400).json({
+      error: "Missing magnet URL",
+      message: "A magnet URL is required",
+    });
+  }
+
+  if (!isValidMagnet(magnet)) {
+    logger.warn("Invalid magnet URL attempt", {
+      ip: req.ip,
+      magnet: magnet.substring(0, 100),
+    });
+
+    return res.status(400).json({
+      error: "Invalid magnet URL",
+      message: "The provided magnet URL is not valid",
+    });
+  }
+
+  next();
+}
+
+/**
+ * CORS configuration
+ */
+export function configureCORS(app) {
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    // Allow localhost and Electron in development
+    if (ENV.IS_DEVELOPMENT || ENV.IS_ELECTRON) {
+      res.setHeader("Access-Control-Allow-Origin", origin || "*");
+    }
+
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "Content-Range, Content-Length, Accept-Ranges",
+    );
+
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(204);
+    }
+
+    next();
+  });
 }
