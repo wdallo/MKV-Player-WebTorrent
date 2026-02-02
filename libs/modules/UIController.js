@@ -60,13 +60,22 @@ export class UIController {
   }
 
   bindEvents() {
+    console.log("[UI] Binding events to:", {
+      retryBtn: this.elements.retryBtn,
+      resumeBtn: this.elements.resumeBtn,
+      restartBtn: this.elements.restartBtn,
+    });
+
     this.elements.retryBtn?.addEventListener("click", () => {
+      console.log("[UI] Retry button clicked");
       this.onRetryClick?.();
     });
     this.elements.resumeBtn?.addEventListener("click", () => {
+      console.log("[UI] Resume button clicked");
       this.onResumeClick?.();
     });
     this.elements.restartBtn?.addEventListener("click", () => {
+      console.log("[UI] Restart button clicked");
       this.onRestartClick?.();
     });
   }
@@ -251,15 +260,30 @@ export class UIController {
   }
 
   showResumeButton() {
+    console.log("[UI] showResumeButton called");
+    console.log("[UI] Resume elements:", {
+      resumeBtn: this.elements.resumeBtn,
+      restartBtn: this.elements.restartBtn,
+      resumeModule: this.elements.resumeModule,
+    });
+
     // Hide overlay when showing resume module to prevent conflicts
     if (this.overlay) {
       this.overlay.hide();
     }
 
-    if (this.elements.resumeBtn) this.elements.resumeBtn.style.display = "";
-    if (this.elements.restartBtn) this.elements.restartBtn.style.display = "";
-    if (this.elements.resumeModule)
+    if (this.elements.resumeBtn) {
+      this.elements.resumeBtn.style.display = "";
+      console.log("[UI] Resume button display set");
+    }
+    if (this.elements.restartBtn) {
+      this.elements.restartBtn.style.display = "";
+      console.log("[UI] Restart button display set");
+    }
+    if (this.elements.resumeModule) {
       this.elements.resumeModule.style.display = "flex";
+      console.log("[UI] Resume module display set to flex");
+    }
   }
 
   hideResumeButton() {

@@ -134,6 +134,15 @@
         const player = new VideoPlayerController(magnetUrl);
         window.player = player;
         player.initialize();
+
+        const videoEl = document.getElementById("player");
+        const statusSection = document.querySelector(".status-section");
+
+        if (videoEl && statusSection) {
+          videoEl.addEventListener("loadeddata", () => {
+            statusSection.style.display = "none";
+          });
+        }
       });
 
       const statusDetails = document.querySelector(".status-details");

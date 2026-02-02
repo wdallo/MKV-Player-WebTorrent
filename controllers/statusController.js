@@ -56,15 +56,15 @@ export async function getStatus(req, res) {
   if (state.videoFile && state.videoFile.downloaded > 0) {
     if (t.done) {
       status = "done";
-    } else if (t.numPeers === 0 && t.downloaded < 1024 * 1024) {
-      // Only show "no peers" if very little downloaded
-      status = "no peers";
     } else {
+      // If downloading video file, always show downloading status
+      // Don't switch to "no peers" as WebTorrent can temporarily report 0 peers
       status = "downloading";
     }
   } else if (!t.ready && !t.metadata) {
     status = "fetching metadata";
-  } else if (t.numPeers === 0) {
+  } else if (t.numPeers === 0 && t.downloaded < 1024 * 1024) {
+    // Only show "no peers" if very little downloaded
     status = "no peers";
   } else if (t.downloaded === 0) {
     status = "connecting";

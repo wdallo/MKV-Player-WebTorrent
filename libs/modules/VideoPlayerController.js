@@ -1263,25 +1263,36 @@ export class VideoPlayerController {
 
   // Handle resume button click
   handleResumeClick() {
+    console.log("[PLAYER] handleResumeClick called", {
+      pendingResumeTime: this._pendingResumeTime,
+      videoDuration: this.ui.elements.video.duration,
+    });
+
     this.ui.hideResumeButton();
     if (
       this._pendingResumeTime &&
       this.ui.elements.video.duration > this._pendingResumeTime
     ) {
+      console.log("[PLAYER] Setting currentTime to:", this._pendingResumeTime);
       this.ui.elements.video.currentTime = this._pendingResumeTime;
 
       if (this.ui.elements.video.paused) {
+        console.log("[PLAYER] Playing video");
         this.ui.elements.video.play();
       }
+    } else {
+      console.log("[PLAYER] Invalid resume time or duration");
     }
   }
 
   // Handle restart button click
   handleRestartClick() {
+    console.log("[PLAYER] handleRestartClick called");
     this.ui.elements.video.currentTime = 0;
     this.ui.hideResumeButton();
     localStorage.removeItem(this.resumeTimeKey);
     if (this.ui.elements.video.paused) {
+      console.log("[PLAYER] Playing video from start");
       this.ui.elements.video.play();
     }
   }
