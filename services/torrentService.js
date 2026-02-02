@@ -1,547 +1,960 @@
-// Torrent logic and state management
+/**
+ * Refactored Torrent Service with class-based architecture
+ * Handles WebTorrent operations with improved error handling and performance
+ */
 
 import WebTorrent from "webtorrent";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
-import { PERF_CONFIG } from "../configs/all.config.js";
+import { EventEmitter } from "events";
+import { TORRENT_CONFIG, FS_CONFIG } from "../configs/environment.config.js";
+import { createLogger } from "../utils/logger.js";
+import {
+  ensureDirectory,
+  safeDeleteFile,
+  isVideoFile,
+} from "../utils/fileUtils.js";
+import { isValidMagnet } from "../utils/validator.js";
 
-// Support __dirname in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const logger = createLogger("TORRENT_SERVICE");
 
-// Use environment variable for downloads directory (set by electron-main.cjs for packaged builds)
-// or global variable (set by electron-server.cjs) or fallback to local downloads
-const DOWNLOAD_DIR =
-  process.env.DOWNLOADS_DIR ||
-  global.DOWNLOADS_DIR ||
-  path.join(__dirname, "../downloads");
-
-console.log(`[TORRENT] Using downloads directory: ${DOWNLOAD_DIR}`);
-
-// Ensure download directory exists
-if (!fs.existsSync(DOWNLOAD_DIR)) {
-  try {
-    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
-    console.log(`Created downloads directory: ${DOWNLOAD_DIR}`);
-  } catch (error) {
-    console.error(`Failed to create downloads directory: ${error.message}`);
+/**
+ * Torrent state class to encapsulate torrent data
+ */
+class TorrentState {
+  constructor(magnet) {
+    this.magnet = magnet;
+    this.torrent = null;
+    this.videoFile = null;
+    this.videoMime = "video/mp4";
+    this.lastAccess = Date.now();
+    this.createdAt = Date.now();
+    this.accessCount = 0;
+    this.deleteTimer = null;
+    this.fileDeleted = false;
+    this.deletedAt = null;
+    this.error = null;
   }
-}
 
-// Constants
-const AUTO_DELETE_DELAY = 72 * 60 * 60 * 1000; // 72 hours in milliseconds
-const STATE_CLEANUP_DELAY = 5000; // 5 seconds
-const CACHE_TTL = 30000; // 30 seconds
-const CACHE_MAX_SIZE = 50;
-const INACTIVE_THRESHOLD = 60 * 60 * 1000; // 1 hour
-const CACHE_CLEANUP_AGE = 5 * 60 * 1000; // 5 minutes
+  /**
+   * Update last access time and increment counter
+   */
+  touch() {
+    this.lastAccess = Date.now();
+    this.accessCount++;
+  }
 
-// Watch for file deletions in the download directory with debouncing
-// If a video file is deleted from disk, remove its torrent from the client and memory
-let fileWatchTimeout = null;
-const fileEventQueue = new Map();
+  /**
+   * Check if torrent is inactive
+   */
+  isInactive(threshold = TORRENT_CONFIG.INACTIVE_THRESHOLD) {
+    return Date.now() - this.lastAccess > threshold;
+  }
 
-function processFileEvent(filename) {
-  const filePath = path.join(DOWNLOAD_DIR, filename);
+  /**
+   * Check if torrent is ready for streaming
+   */
+  isReady(minBytes = TORRENT_CONFIG.MIN_READY_BYTES) {
+    // Basic checks
+    if (!this.videoFile) return false;
 
-  // Use non-blocking stat
-  fs.stat(filePath, (err, stats) => {
-    if (err && err.code === "ENOENT") {
-      // File was deleted, find and remove torrent efficiently
-      const torrentEntries = Object.entries(torrents);
-      for (const [magnet, state] of torrentEntries) {
-        if (state.videoFile?.name === filename) {
-          console.log(`File deleted: ${filename}, cleaning up torrent data`);
-
-          // Remove torrent from client
-          if (state.torrent) {
-            client.remove(magnet, () => {
-              console.log(`Torrent removed for deleted file: ${filename}`);
-            });
-          }
-
-          // Clear auto-delete timer if it exists
-          if (state.deleteTimer) {
-            clearTimeout(state.deleteTimer);
-            console.log(`Cleared auto-delete timer for: ${filename}`);
-          }
-
-          // Mark this torrent as deleted so frontend can clean localStorage
-          state.fileDeleted = true;
-          state.deletedAt = Date.now();
-
-          // Keep the state briefly so frontend can detect deletion and clean localStorage
-          setTimeout(() => {
-            delete torrents[magnet];
-            console.log(`Torrent state cleaned up for: ${filename}`);
-          }, STATE_CLEANUP_DELAY);
-
-          break;
-        }
-      }
+    // If enough data downloaded, consider ready
+    if (this.videoFile.downloaded >= minBytes) {
+      return true;
     }
-  });
-}
 
-try {
-  // Only setup file watching if directory exists and is accessible
-  if (fs.existsSync(DOWNLOAD_DIR)) {
-    fs.watch(DOWNLOAD_DIR, { persistent: false }, (eventType, filename) => {
-      if (eventType === "rename" && filename) {
-        // Debounce file events to prevent excessive processing
-        fileEventQueue.set(filename, Date.now());
-
-        if (fileWatchTimeout) clearTimeout(fileWatchTimeout);
-
-        fileWatchTimeout = setTimeout(() => {
-          for (const [file] of fileEventQueue) {
-            processFileEvent(file);
-          }
-          fileEventQueue.clear();
-        }, PERF_CONFIG.FILE_WATCH_DEBOUNCE);
-      }
-    });
-    console.log(`File watching setup for: ${DOWNLOAD_DIR}`);
-  } else {
-    console.warn(
-      `Download directory does not exist, file watching disabled: ${DOWNLOAD_DIR}`
+    // Otherwise check if first piece is downloaded (for starting from beginning)
+    return (
+      this.videoFile.downloaded >= minBytes && this.isFirstPieceDownloaded()
     );
   }
-} catch (e) {
-  console.error("Failed to watch download directory:", e.message);
-}
 
-// Create a WebTorrent client with optimized performance settings
-const client = new WebTorrent({
-  maxConns: 50, // Increased connection limit for better performance
-  nodeId: null, // Random node ID
-  peerId: null, // Random peer ID
-  tracker: {
-    announce: [], // Will use default trackers
-    getAnnounceOpts() {
-      return {
-        numwant: 80, // Request more peers for better connectivity
-        compact: 1, // Compact response
-      };
-    },
-  },
-  dht: true, // Enable DHT
-  lsd: true, // Enable local service discovery
-  webSeeds: true, // Enable web seeds
-  utp: true, // Enable uTP for better NAT traversal
-  blocklist: false, // Disable blocklist for speed
-  // Performance optimizations
-  downloadLimit: -1, // No download limit
-  uploadLimit: 2 * 1024 * 1024, // 2MB/s upload limit for better seeding
-  // Additional performance options
-  chunkSize: 16384, // 16KB chunks for better streaming
-});
-
-// Store all active torrents and their state with performance tracking
-// Structure: magnet -> { torrent, videoFile, videoMime, lastAccess, deleteTimer, accessCount, createdAt }
-const torrents = {};
-const torrentCache = new Map(); // LRU cache for frequently accessed torrents
-
-// Performance helpers
-function updateTorrentCache(magnet, state) {
-  if (!magnet || !state) return;
-
-  torrentCache.set(magnet, {
-    ...state,
-    cachedAt: Date.now(),
-  });
-
-  // Maintain cache size
-  if (torrentCache.size > CACHE_MAX_SIZE) {
-    const firstKey = torrentCache.keys().next().value;
-    torrentCache.delete(firstKey);
-  }
-}
-
-function selectPiecesOptimized(videoFile, seekPosition = 0) {
-  if (!videoFile?._torrent) return;
-
-  const pieceLength = videoFile._torrent.pieceLength || 32768;
-  const totalPieces = Math.floor(videoFile.length / pieceLength);
-  const startPiece = Math.floor(seekPosition / pieceLength);
-
-  // Dynamic batch size based on file size and network conditions
-  const dynamicBatchSize = Math.min(
-    Math.max(PERF_CONFIG.PIECE_SELECTION_BATCH_SIZE, totalPieces * 0.1),
-    totalPieces
-  );
-
-  // Priority zones: critical (immediate), high (next 20), normal (rest)
-  const criticalZone = Math.min(5, dynamicBatchSize);
-  const highPriorityZone = Math.min(20, dynamicBatchSize);
-
-  for (
-    let i = 0;
-    i < dynamicBatchSize;
-    i += Math.max(1, PERF_CONFIG.PIECE_SELECTION_INTERVAL)
-  ) {
-    const pieceIndex = (startPiece + i) % totalPieces;
-    const start = pieceIndex * pieceLength;
-    const end = Math.min(start + pieceLength - 1, videoFile.length - 1);
-
-    if (start < videoFile.length) {
-      // Assign priority based on distance from seek position
-      const priority = i < criticalZone ? 2 : i < highPriorityZone ? 1 : 0;
-      videoFile.select(start, end, priority > 0);
+  /**
+   * Check if first piece is downloaded
+   */
+  isFirstPieceDownloaded() {
+    if (!this.videoFile?._torrent?.bitfield) {
+      return false;
     }
+    const firstPiece = this.videoFile._startPiece || 0;
+    return this.videoFile._torrent.bitfield.get(firstPiece);
   }
 
-  // Also select end pieces for better buffering
-  const endPieces = Math.min(5, totalPieces - startPiece - dynamicBatchSize);
-  for (let i = 0; i < endPieces; i++) {
-    const pieceIndex = totalPieces - 1 - i;
-    const start = pieceIndex * pieceLength;
-    const end = Math.min(start + pieceLength - 1, videoFile.length - 1);
-    if (start < videoFile.length) {
-      videoFile.select(start, end, false);
+  /**
+   * Clear auto-delete timer
+   */
+  clearTimer() {
+    if (this.deleteTimer) {
+      clearTimeout(this.deleteTimer);
+      this.deleteTimer = null;
     }
   }
 }
 
 /**
- * Get or add a torrent to the client with performance optimizations.
- * @param {string} magnet - Magnet URI
- * @param {function} [cb] - Optional callback when torrent is ready
- * @param {number} [seekPosition] - Optional seek position for piece selection
- * @returns {object|null} Torrent state or null if invalid
+ * LRU Cache for torrent states
  */
-function getOrAddTorrent(magnet, cb, seekPosition = 0) {
-  if (!magnet || !magnet.startsWith("magnet:")) return null;
-
-  // Check cache first
-  const cached = torrentCache.get(magnet);
-  if (cached && cached.cachedAt && Date.now() - cached.cachedAt < CACHE_TTL) {
-    if (cb) cb(cached.torrent);
-    return cached;
+class TorrentCache {
+  constructor(maxSize = TORRENT_CONFIG.CACHE_MAX_SIZE) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
   }
 
-  // Check if torrent exists
-  if (torrents[magnet]) {
-    const state = torrents[magnet];
-    const videoFile = state.videoFile;
-
-    if (videoFile) {
-      // Optimized piece selection based on seek position
-      const downloadSize =
-        seekPosition > 0
-          ? PERF_CONFIG.STREAMING_DOWNLOAD_SIZE
-          : PERF_CONFIG.INITIAL_DOWNLOAD_SIZE;
-
-      const end = Math.min(
-        videoFile.length - 1,
-        seekPosition + downloadSize - 1
-      );
-      videoFile.select(seekPosition, end, true); // High priority
-
-      // Select additional pieces optimally
-      selectPiecesOptimized(videoFile, seekPosition);
+  get(key) {
+    if (!this.cache.has(key)) {
+      return null;
     }
 
-    // Update access tracking
-    state.lastAccess = Date.now();
-    state.accessCount = (state.accessCount || 0) + 1;
+    const item = this.cache.get(key);
 
-    // Update cache
-    updateTorrentCache(magnet, state);
+    // Check TTL
+    if (Date.now() - item.cachedAt > TORRENT_CONFIG.CACHE_TTL) {
+      this.cache.delete(key);
+      return null;
+    }
 
-    if (cb) cb(state.torrent);
-    return state;
+    // Move to end (most recently used)
+    this.cache.delete(key);
+    this.cache.set(key, item);
+
+    return item.data;
   }
 
-  // Prevent too many concurrent torrents
-  const activeTorrents = Object.keys(torrents).length;
-  if (activeTorrents >= PERF_CONFIG.MAX_CONCURRENT_TORRENTS) {
-    console.warn(
-      `Max concurrent torrents reached (${activeTorrents}). Consider cleanup.`
-    );
-    // Cleanup least recently used torrents
-    cleanupOldTorrents();
+  set(key, data) {
+    // Remove if exists to update position
+    this.cache.delete(key);
+
+    // Remove oldest if at capacity
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+
+    this.cache.set(key, {
+      data,
+      cachedAt: Date.now(),
+    });
   }
 
-  // Create new torrent state
-  torrents[magnet] = {
-    torrent: null,
-    videoFile: null,
-    videoMime: "video/mp4",
-    lastAccess: Date.now(),
-    deleteTimer: null,
-    accessCount: 1,
-    createdAt: Date.now(),
-  };
+  delete(key) {
+    this.cache.delete(key);
+  }
 
-  // Set up auto-delete timer with better error handling
-  const setupAutoDelete = (magnetUri) => {
-    const timer = setTimeout(() => {
-      console.log(`Auto-deleting torrent after 72 hours: ${magnetUri}`);
-      const torrentPath = destroyTorrent(magnetUri);
-      if (torrentPath) {
-        import("fs").then(({ rm }) => {
-          rm(torrentPath, { recursive: true, force: true })
-            .then(() => console.log(`Auto-deleted: ${torrentPath}`))
-            .catch((err) => console.error(`Failed to auto-delete: ${err}`));
+  clear() {
+    this.cache.clear();
+  }
+
+  get size() {
+    return this.cache.size;
+  }
+}
+
+/**
+ * Main Torrent Service Class
+ */
+class TorrentService extends EventEmitter {
+  constructor() {
+    super();
+
+    this.client = null;
+    this.torrents = new Map();
+    this.cache = new TorrentCache();
+    this.downloadDir = FS_CONFIG.DOWNLOAD_DIR;
+    this.isInitialized = false;
+    this.monitoringInterval = null;
+    this.cleanupInterval = null;
+  }
+
+  /**
+   * Initialize the torrent service
+   */
+  async initialize() {
+    if (this.isInitialized) {
+      logger.warn("Torrent service already initialized");
+      return;
+    }
+
+    try {
+      // Ensure download directory exists
+      await ensureDirectory(this.downloadDir);
+      logger.info("Download directory ready", { path: this.downloadDir });
+
+      // Create WebTorrent client
+      this.client = new WebTorrent({
+        maxConns: TORRENT_CONFIG.MAX_CONNECTIONS,
+        nodeId: null,
+        peerId: null,
+        tracker: {
+          announce: [],
+          getAnnounceOpts() {
+            return {
+              numwant: 80,
+              compact: 1,
+            };
+          },
+        },
+        dht: TORRENT_CONFIG.DHT_ENABLED,
+        lsd: TORRENT_CONFIG.LSD_ENABLED,
+        webSeeds: TORRENT_CONFIG.WEB_SEEDS_ENABLED,
+        utp: TORRENT_CONFIG.UTP_ENABLED,
+        blocklist: TORRENT_CONFIG.BLOCKLIST_ENABLED,
+        downloadLimit: TORRENT_CONFIG.DOWNLOAD_LIMIT,
+        uploadLimit: TORRENT_CONFIG.UPLOAD_LIMIT,
+      });
+
+      // Setup error handling
+      this.client.on("error", (error) => {
+        logger.error("WebTorrent client error", error);
+        this.emit("client-error", error);
+      });
+
+      // Start monitoring and cleanup
+      this.startMonitoring();
+      this.startPeriodicCleanup();
+
+      this.isInitialized = true;
+      logger.info("Torrent service initialized successfully");
+    } catch (error) {
+      logger.error("Failed to initialize torrent service", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get or add torrent
+   */
+  async getOrAddTorrent(magnet, seekPosition = 0) {
+    // Validate magnet URI
+    if (!isValidMagnet(magnet)) {
+      logger.warn("Invalid magnet URI");
+      return null;
+    }
+
+    // Check cache first
+    const cached = this.cache.get(magnet);
+    if (cached) {
+      logger.debug("Torrent found in cache");
+      cached.touch();
+      this.optimizePieceSelection(cached.videoFile, seekPosition);
+      return cached;
+    }
+
+    // Check if torrent already exists and is ready
+    if (this.torrents.has(magnet)) {
+      const state = this.torrents.get(magnet);
+
+      // Only return cached state if videoFile is set
+      if (state.videoFile) {
+        state.touch();
+        this.cache.set(magnet, state);
+        this.optimizePieceSelection(state.videoFile, seekPosition);
+        return state;
+      } else {
+        logger.debug("Torrent exists but videoFile not ready yet, waiting...", {
+          magnet: magnet.substring(0, 60) + "...",
+          hasTorrent: !!state.torrent,
+          torrentReady: state.torrent?.ready,
+        });
+
+        // Wait for the torrent to be ready with timeout
+        return new Promise((resolve, reject) => {
+          const startTime = Date.now();
+          const timeout = 30000; // 30 seconds timeout
+
+          const checkReady = () => {
+            if (state.videoFile) {
+              logger.info("VideoFile ready after waiting", {
+                waitTime: Date.now() - startTime,
+              });
+              resolve(state);
+            } else if (state.error) {
+              logger.error("State has error while waiting", {
+                error: state.error.message,
+              });
+              reject(state.error);
+            } else if (Date.now() - startTime > timeout) {
+              const timeoutError = new Error("Timeout waiting for videoFile");
+              logger.error("Timeout waiting for videoFile", {
+                waitTime: Date.now() - startTime,
+                hasTorrent: !!state.torrent,
+                torrentReady: state.torrent?.ready,
+              });
+              reject(timeoutError);
+            } else {
+              // Check again in 100ms
+              setTimeout(checkReady, 100);
+            }
+          };
+          checkReady();
         });
       }
-    }, AUTO_DELETE_DELAY);
-
-    torrents[magnetUri].deleteTimer = timer;
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`Auto-delete scheduled for ${magnetUri} in 72 hours`);
     }
-  };
 
-  setupAutoDelete(magnet);
+    // Check max concurrent torrents
+    if (this.torrents.size >= TORRENT_CONFIG.MAX_CONCURRENT_TORRENTS) {
+      logger.warn("Max concurrent torrents reached, cleaning up old torrents");
+      await this.cleanupOldTorrents();
+    }
 
-  // Add torrent to client with error handling
-  try {
-    torrents[magnet].torrent = client.add(
-      magnet,
-      { path: DOWNLOAD_DIR, strategy: "sequential" }, // Sequential for streaming
-      (torrent) => {
-        // Find the main video file (.mp4 or .mkv)
-        const videoFile = torrent.files.find(
-          (f) => f.name.endsWith(".mp4") || f.name.endsWith(".mkv")
-        );
+    // Add new torrent
+    return await this.addTorrent(magnet, seekPosition);
+  }
 
-        if (videoFile) {
-          torrents[magnet].videoFile = videoFile;
-          torrents[magnet].videoMime = videoFile.name.endsWith(".mkv")
-            ? "video/x-matroska"
-            : "video/mp4";
+  /**
+   * Add new torrent
+   */
+  async addTorrent(magnet, seekPosition = 0) {
+    return new Promise((resolve, reject) => {
+      logger.info("Adding new torrent", {
+        magnet: magnet.substring(0, 60) + "...",
+      });
 
-          // Optimized initial piece selection
-          const end = Math.min(
-            videoFile.length - 1,
-            PERF_CONFIG.STREAMING_DOWNLOAD_SIZE - 1
-          );
-          videoFile.select(0, end, false);
-
-          // Select additional pieces for smooth playback
-          selectPiecesOptimized(videoFile, seekPosition);
+      try {
+        // Extract info hash from magnet URL for duplicate checking
+        let infoHash = null;
+        try {
+          const match = magnet.match(/urn:btih:([a-zA-Z0-9]+)/i);
+          if (match && match[1]) {
+            infoHash = match[1].toLowerCase();
+          }
+        } catch (e) {
+          logger.warn("Failed to extract info hash from magnet", {
+            magnet: magnet.substring(0, 60) + "...",
+          });
         }
 
-        torrents[magnet].lastAccess = Date.now();
-        updateTorrentCache(magnet, torrents[magnet]);
+        // Check if torrent already exists in WebTorrent client
+        // Try both magnet and info hash
+        let existingTorrent =
+          this.client.get(magnet) ||
+          (infoHash ? this.client.get(infoHash) : null);
 
-        if (cb) cb(torrent);
+        // If not found, manually search through all torrents by infoHash
+        if (!existingTorrent && infoHash && this.client.torrents) {
+          existingTorrent = this.client.torrents.find(
+            (t) => t.infoHash && t.infoHash.toLowerCase() === infoHash,
+          );
+
+          if (existingTorrent) {
+            logger.info("Found existing torrent by iterating torrents array", {
+              infoHash,
+              torrentName: existingTorrent.name || "unknown",
+            });
+          }
+        }
+
+        // Create state only after checking for duplicates
+        const state = new TorrentState(magnet);
+        this.torrents.set(magnet, state);
+
+        // WebTorrent.get() can return an array if multiple torrents match
+        if (Array.isArray(existingTorrent)) {
+          existingTorrent = existingTorrent[0];
+        }
+
+        if (existingTorrent) {
+          logger.info("Torrent already exists in client, reusing it", {
+            magnet: magnet.substring(0, 60) + "...",
+            infoHash: existingTorrent.infoHash || "unknown",
+            ready: existingTorrent.ready,
+            hasFiles: !!(
+              existingTorrent.files && existingTorrent.files.length > 0
+            ),
+          });
+
+          // Reuse existing torrent
+          state.torrent = existingTorrent;
+
+          // Check if torrent is fully ready (has files)
+          const isFullyReady =
+            existingTorrent.ready &&
+            existingTorrent.files &&
+            existingTorrent.files.length > 0;
+
+          if (isFullyReady) {
+            this.onTorrentReady(existingTorrent, state, seekPosition);
+            resolve(state);
+          } else {
+            logger.warn("Existing torrent not fully ready", {
+              ready: existingTorrent.ready,
+              hasFiles: !!existingTorrent.files,
+              filesLength: existingTorrent.files?.length,
+            });
+
+            // Wait for torrent to be ready - check if event methods exist
+            if (typeof existingTorrent.once === "function") {
+              // Set a timeout in case ready event never fires
+              const readyTimeout = setTimeout(() => {
+                logger.error(
+                  "Timeout waiting for existing torrent ready event",
+                  {
+                    infoHash,
+                    ready: existingTorrent.ready,
+                    hasFiles: !!existingTorrent.files,
+                  },
+                );
+                reject(new Error("Timeout waiting for torrent ready"));
+              }, 30000);
+
+              existingTorrent.once("ready", () => {
+                clearTimeout(readyTimeout);
+                logger.info("Existing torrent ready event fired");
+                this.onTorrentReady(existingTorrent, state, seekPosition);
+                resolve(state);
+              });
+
+              // Also handle errors
+              existingTorrent.once("error", (error) => {
+                clearTimeout(readyTimeout);
+                logger.error("Existing torrent error", error);
+                state.error = error;
+                this.emit("torrent-error", { magnet, error });
+                reject(error);
+              });
+
+              // If torrent is already ready but files not populated yet, poll for files
+              if (existingTorrent.ready) {
+                logger.info(
+                  "Torrent is ready but no files, polling for files...",
+                );
+                const pollFiles = () => {
+                  if (
+                    existingTorrent.files &&
+                    existingTorrent.files.length > 0
+                  ) {
+                    clearTimeout(readyTimeout);
+                    logger.info("Files populated, calling onTorrentReady");
+                    this.onTorrentReady(existingTorrent, state, seekPosition);
+                    resolve(state);
+                  } else {
+                    setTimeout(pollFiles, 100);
+                  }
+                };
+                pollFiles();
+              }
+            } else {
+              // Torrent object is invalid (missing event methods)
+              // Remove it and add fresh torrent
+              logger.warn(
+                "Existing torrent is invalid, removing and re-adding",
+                {
+                  magnet: magnet.substring(0, 60) + "...",
+                  ready: existingTorrent.ready,
+                  hasFiles: !!existingTorrent.files,
+                  hasOnce: typeof existingTorrent.once === "function",
+                },
+              );
+
+              try {
+                existingTorrent.destroy();
+              } catch (destroyError) {
+                logger.warn("Failed to destroy invalid torrent", destroyError);
+              }
+
+              // Set existingTorrent to null so we add a fresh one below
+              existingTorrent = null;
+            }
+          }
+
+          // Setup auto-delete timer if we're using the existing torrent
+          if (existingTorrent) {
+            this.setupAutoDelete(magnet);
+            return;
+          }
+        }
+
+        // Add new torrent if no valid existing torrent found
+        logger.info("Adding fresh torrent to client", {
+          magnet: magnet.substring(0, 60) + "...",
+        });
+
+        // Wrap client.add in try-catch to handle duplicate errors
+        try {
+          // Add new torrent if it doesn't exist
+          state.torrent = this.client.add(
+            magnet,
+            {
+              path: this.downloadDir,
+              strategy: "sequential",
+            },
+            (torrent) => {
+              this.onTorrentReady(torrent, state, seekPosition);
+              resolve(state);
+            },
+          );
+
+          // Error handling
+          state.torrent.on("error", (error) => {
+            logger.error("Torrent error", error);
+            state.error = error;
+            this.emit("torrent-error", { magnet, error });
+            reject(error);
+          });
+
+          // Setup auto-delete timer
+          this.setupAutoDelete(magnet);
+        } catch (addError) {
+          // If duplicate error, try to find the existing torrent
+          if (addError.message && addError.message.includes("duplicate")) {
+            logger.warn(
+              "Duplicate torrent error, attempting to find existing torrent",
+              {
+                infoHash,
+                error: addError.message,
+              },
+            );
+
+            // Try to find by iterating all torrents
+            const foundTorrent =
+              infoHash && this.client.torrents
+                ? this.client.torrents.find(
+                    (t) => t.infoHash && t.infoHash.toLowerCase() === infoHash,
+                  )
+                : null;
+
+            if (foundTorrent) {
+              logger.info("Found duplicate torrent, reusing it", {
+                infoHash,
+                name: foundTorrent.name || "unknown",
+              });
+
+              state.torrent = foundTorrent;
+
+              // Check if ready
+              const isFullyReady =
+                foundTorrent.ready &&
+                foundTorrent.files &&
+                foundTorrent.files.length > 0;
+
+              if (isFullyReady) {
+                this.onTorrentReady(foundTorrent, state, seekPosition);
+                resolve(state);
+              } else if (typeof foundTorrent.once === "function") {
+                foundTorrent.once("ready", () => {
+                  this.onTorrentReady(foundTorrent, state, seekPosition);
+                  resolve(state);
+                });
+                foundTorrent.once("error", (error) => {
+                  logger.error("Duplicate torrent error", error);
+                  state.error = error;
+                  reject(error);
+                });
+              } else {
+                reject(
+                  new Error(
+                    "Duplicate torrent found but not ready and cannot wait",
+                  ),
+                );
+              }
+
+              this.setupAutoDelete(magnet);
+            } else {
+              // Could not find torrent, reject
+              logger.error("Duplicate error but could not find torrent", {
+                infoHash,
+              });
+              reject(addError);
+            }
+          } else {
+            // Different error, rethrow
+            throw addError;
+          }
+        }
+      } catch (error) {
+        logger.error("Failed to add torrent", {
+          error: error.message,
+          code: error.code,
+          stack: error.stack,
+          magnet: magnet.substring(0, 60) + "...",
+        });
+        this.torrents.delete(magnet);
+        reject(error);
       }
+    });
+  }
+
+  /**
+   * Handle torrent ready event
+   */
+  onTorrentReady(torrent, state, seekPosition) {
+    logger.info("onTorrentReady called", {
+      torrentName: torrent?.name,
+      hasTorrent: !!torrent,
+      hasFiles: !!(torrent && torrent.files),
+      filesCount: torrent?.files?.length,
+      stateMagnet: state?.magnet?.substring(0, 60),
+    });
+
+    // Validate torrent object
+    if (!torrent || !torrent.files) {
+      logger.error("Invalid torrent object in onTorrentReady", {
+        hasTorrent: !!torrent,
+        hasFiles: !!(torrent && torrent.files),
+      });
+      state.error = new Error("Invalid torrent object");
+      return;
+    }
+
+    logger.info("Torrent ready - finding video file", {
+      name: torrent.name || "unknown",
+      files: torrent.files.length,
+    });
+
+    // Find video file
+    const videoFile = torrent.files.find((f) => isVideoFile(f.name));
+
+    if (!videoFile) {
+      logger.warn("No video file found in torrent");
+      state.error = new Error("No video file found");
+      return;
+    }
+
+    state.videoFile = videoFile;
+    state.videoMime = videoFile.name.endsWith(".mkv")
+      ? "video/x-matroska"
+      : "video/mp4";
+
+    logger.info("Video file set on state", {
+      name: videoFile.name,
+      size: videoFile.length,
+      mime: state.videoMime,
+      downloaded: videoFile.downloaded,
+      stateMagnet: state.magnet.substring(0, 60),
+    });
+
+    // Optimize piece selection
+    this.optimizePieceSelection(videoFile, seekPosition);
+
+    // Update cache
+    this.cache.set(state.magnet, state);
+
+    logger.info("State cached, torrent fully ready", {
+      magnet: state.magnet.substring(0, 60) + "...",
+    });
+
+    this.emit("torrent-ready", state);
+  }
+
+  /**
+   * Optimize piece selection for streaming
+   */
+  optimizePieceSelection(videoFile, seekPosition = 0) {
+    if (!videoFile?._torrent) {
+      return;
+    }
+
+    const pieceLength = videoFile._torrent.pieceLength || 32768;
+    const totalPieces = Math.floor(videoFile.length / pieceLength);
+    const startPiece = Math.floor(seekPosition / pieceLength);
+
+    // Calculate dynamic batch size
+    const batchSize = Math.min(
+      Math.max(
+        TORRENT_CONFIG.PIECE_SELECTION_BATCH_SIZE,
+        Math.floor(totalPieces * 0.1),
+      ),
+      totalPieces,
     );
 
-    // Add error handling for torrent
-    if (torrents[magnet].torrent) {
-      torrents[magnet].torrent.on("error", (err) => {
-        console.error(`Torrent error for ${magnet}:`, err);
-        if (cb) cb(null, err);
-      });
+    // Priority zones
+    const criticalZone = Math.min(5, batchSize);
+    const highPriorityZone = Math.min(20, batchSize);
+
+    // Select pieces with priority
+    for (
+      let i = 0;
+      i < batchSize;
+      i += TORRENT_CONFIG.PIECE_SELECTION_INTERVAL
+    ) {
+      const pieceIndex = (startPiece + i) % totalPieces;
+      const start = pieceIndex * pieceLength;
+      const end = Math.min(start + pieceLength - 1, videoFile.length - 1);
+
+      if (start < videoFile.length) {
+        const priority = i < criticalZone ? 2 : i < highPriorityZone ? 1 : 0;
+        videoFile.select(start, end, priority > 0);
+      }
     }
-  } catch (error) {
-    console.error(`Failed to add torrent ${magnet}:`, error);
-    delete torrents[magnet];
-    if (cb) cb(null, error);
-    return null;
+
+    // Select end pieces for buffer
+    const endPieces = Math.min(5, totalPieces - startPiece - batchSize);
+    for (let i = 0; i < endPieces; i++) {
+      const pieceIndex = totalPieces - 1 - i;
+      const start = pieceIndex * pieceLength;
+      const end = Math.min(start + pieceLength - 1, videoFile.length - 1);
+
+      if (start < videoFile.length) {
+        videoFile.select(start, end, false);
+      }
+    }
   }
 
-  return torrents[magnet];
-}
+  /**
+   * Destroy torrent
+   */
+  async destroyTorrent(magnet) {
+    if (!this.torrents.has(magnet)) {
+      logger.debug("Torrent not found in cache", {
+        magnet: magnet.substring(0, 60) + "...",
+      });
+      return null;
+    }
 
-// Cleanup old torrents to free memory
-function cleanupOldTorrents() {
-  const now = Date.now();
-  const torrentEntries = Object.entries(torrents);
+    const state = this.torrents.get(magnet);
+    let torrentPath = null;
 
-  // Sort by last access time and remove oldest
-  const sortedTorrents = torrentEntries
-    .filter(([_, state]) => !state.deleteTimer) // Don't cleanup torrents with auto-delete
-    .sort((a, b) => a[1].lastAccess - b[1].lastAccess);
+    logger.info("Destroying torrent", {
+      magnet: magnet.substring(0, 60) + "...",
+    });
 
-  const toRemove = Math.min(3, sortedTorrents.length); // Remove up to 3 old torrents
+    // Clear timer
+    state.clearTimer();
 
-  for (let i = 0; i < toRemove; i++) {
-    const [magnet] = sortedTorrents[i];
-    console.log(`Cleaning up old torrent: ${magnet}`);
-    destroyTorrent(magnet);
+    if (state.torrent) {
+      torrentPath = state.torrent.path;
+
+      try {
+        // Check if torrent still exists in client before removing
+        const torrentInClient = this.client.get(magnet);
+
+        if (torrentInClient) {
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              logger.warn("Torrent remove operation timed out after 5s");
+              resolve(); // Resolve anyway to continue cleanup
+            }, 5000);
+
+            this.client.remove(magnet, { destroyStore: true }, (err) => {
+              clearTimeout(timeout);
+              if (err) {
+                // Log error but don't reject - we still want to cleanup our state
+                logger.warn("Error removing torrent from client", {
+                  error: err.message,
+                  code: err.code,
+                  magnet: magnet.substring(0, 60) + "...",
+                });
+              }
+              resolve(); // Always resolve to continue cleanup
+            });
+          });
+
+          logger.info("Torrent removed successfully");
+        } else {
+          logger.debug("Torrent already removed from client");
+        }
+      } catch (error) {
+        logger.error("Error during torrent removal", {
+          error: error.message,
+          code: error.code,
+          stack: error.stack,
+          magnet: magnet.substring(0, 60) + "...",
+        });
+        // Don't throw - continue with cleanup
+      }
+    } else {
+      logger.debug("No active torrent object to remove");
+    }
+
+    // Clean up our internal state regardless of removal success
+    this.cache.delete(magnet);
+    this.torrents.delete(magnet);
+
+    logger.debug("Torrent state cleaned up", {
+      magnet: magnet.substring(0, 60) + "...",
+      remainingTorrents: this.torrents.size,
+    });
+
+    return torrentPath;
   }
-}
 
-// Enhanced resource usage monitoring with adaptive cleanup and better metrics
-function logResourceUsage() {
-  try {
-    const mem = process.memoryUsage();
-    const activeTorrents = Object.keys(torrents).length;
-    const cacheSize = torrentCache.size;
-    const cpuUsage = process.cpuUsage();
+  /**
+   * Extend auto-delete timer
+   */
+  extendAutoDelete(magnet) {
+    if (!this.torrents.has(magnet)) {
+      return;
+    }
 
-    // Performance metrics with additional data
-    const metrics = {
-      activeTorrents,
-      cacheSize,
-      memoryRSS: Math.round(mem.rss / 1024 / 1024), // MB
-      memoryHeap: Math.round(mem.heapUsed / 1024 / 1024), // MB
-      memoryExternal: Math.round(mem.external / 1024 / 1024), // MB
-      uptime: Math.round(process.uptime() / 60), // minutes
-      cpuUser: Math.round(cpuUsage.user / 1000), // ms
-      cpuSystem: Math.round(cpuUsage.system / 1000), // ms
+    const state = this.torrents.get(magnet);
+    state.clearTimer();
+    this.setupAutoDelete(magnet);
+
+    logger.debug("Auto-delete timer extended", {
+      magnet: magnet.substring(0, 60) + "...",
+    });
+  }
+
+  /**
+   * Setup auto-delete timer
+   */
+  setupAutoDelete(magnet) {
+    if (!this.torrents.has(magnet)) {
+      return;
+    }
+
+    const state = this.torrents.get(magnet);
+
+    state.deleteTimer = setTimeout(async () => {
+      logger.info("Auto-deleting torrent", {
+        magnet: magnet.substring(0, 60) + "...",
+      });
+
+      const torrentPath = await this.destroyTorrent(magnet);
+
+      if (torrentPath && state.videoFile) {
+        try {
+          await safeDeleteFile(torrentPath);
+          logger.info("Torrent files deleted");
+        } catch (error) {
+          logger.error("Failed to delete torrent files", error);
+        }
+      }
+    }, TORRENT_CONFIG.AUTO_DELETE_DELAY);
+  }
+
+  /**
+   * Cleanup old torrents
+   */
+  async cleanupOldTorrents() {
+    const now = Date.now();
+    const torrentArray = Array.from(this.torrents.entries());
+
+    // Sort by last access time
+    const sorted = torrentArray
+      .filter(([_, state]) => !state.deleteTimer)
+      .sort((a, b) => a[1].lastAccess - b[1].lastAccess);
+
+    // Remove up to 3 oldest
+    const toRemove = Math.min(3, sorted.length);
+
+    for (let i = 0; i < toRemove; i++) {
+      const [magnet] = sorted[i];
+      logger.info("Cleaning up old torrent", {
+        magnet: magnet.substring(0, 60) + "...",
+      });
+      await this.destroyTorrent(magnet);
+    }
+  }
+
+  /**
+   * Start monitoring resource usage
+   */
+  startMonitoring() {
+    const monitor = () => {
+      try {
+        const mem = process.memoryUsage();
+        const metrics = {
+          activeTorrents: this.torrents.size,
+          cacheSize: this.cache.size,
+          memoryRSS: Math.round(mem.rss / 1024 / 1024),
+          memoryHeap: Math.round(mem.heapUsed / 1024 / 1024),
+          uptime: Math.round(process.uptime() / 60),
+        };
+
+        logger.debug("Resource metrics", metrics);
+
+        // Check thresholds
+        const memoryThreshold = process.arch === "x64" ? 2048 : 1024;
+
+        if (metrics.memoryRSS > memoryThreshold) {
+          logger.warn("High memory usage detected", { rss: metrics.memoryRSS });
+
+          if (global.gc) {
+            global.gc();
+            logger.info("Forced garbage collection");
+          }
+        }
+      } catch (error) {
+        logger.error("Error in monitoring", error);
+      }
     };
 
-    // Adaptive thresholds based on system resources
-    const memoryThreshold = process.arch === "x64" ? 2048 : 1024; // MB
-    const adaptiveMaxTorrents = Math.max(
-      5,
-      PERF_CONFIG.MAX_CONCURRENT_TORRENTS - Math.floor(metrics.memoryRSS / 200)
+    monitor(); // Run immediately
+    this.monitoringInterval = setInterval(
+      monitor,
+      FS_CONFIG.RESOURCE_LOG_INTERVAL,
     );
-
-    // Log warnings and take action for performance issues
-    if (activeTorrents > adaptiveMaxTorrents) {
-      console.warn(
-        `[PERF] High active torrent count: ${activeTorrents} (adaptive limit: ${adaptiveMaxTorrents})`
-      );
-      cleanupOldTorrents();
-    }
-
-    if (mem.rss > memoryThreshold * 1024 * 1024) {
-      console.warn(
-        `[PERF] High memory usage: ${metrics.memoryRSS} MB (threshold: ${memoryThreshold} MB)`
-      );
-      // Force garbage collection if available
-      if (global.gc) {
-        global.gc();
-        console.log("[PERF] Forced garbage collection");
-      }
-    }
-
-    // Cache size management
-    if (cacheSize > 100) {
-      const entriesToRemove = Math.floor(cacheSize * 0.3);
-      const oldestEntries = Array.from(torrentCache.entries())
-        .sort((a, b) => a[1].cachedAt - b[1].cachedAt)
-        .slice(0, entriesToRemove);
-
-      oldestEntries.forEach(([key]) => torrentCache.delete(key));
-      console.log(`[PERF] Cleaned ${entriesToRemove} old cache entries`);
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[PERF] Resource metrics:", metrics);
-    }
-  } catch (error) {
-    console.error("Error logging resource usage:", error);
-  } finally {
-    // Adaptive monitoring interval based on load
-    const currentActiveTorrents = Object.keys(torrents).length;
-    const interval =
-      currentActiveTorrents > 5
-        ? PERF_CONFIG.RESOURCE_LOG_INTERVAL / 2
-        : PERF_CONFIG.RESOURCE_LOG_INTERVAL;
-    setTimeout(logResourceUsage, interval);
-  }
-}
-
-// Periodic cleanup of inactive torrents
-function periodicCleanup() {
-  const now = Date.now();
-
-  for (const [magnet, state] of Object.entries(torrents)) {
-    if (now - state.lastAccess > INACTIVE_THRESHOLD && !state.deleteTimer) {
-      console.log(`Cleaning up inactive torrent: ${magnet}`);
-      destroyTorrent(magnet);
-    }
   }
 
-  // Clear old cache entries
-  for (const [magnet, cached] of torrentCache.entries()) {
-    if (now - cached.cachedAt > CACHE_CLEANUP_AGE) {
-      torrentCache.delete(magnet);
-    }
-  }
+  /**
+   * Start periodic cleanup
+   */
+  startPeriodicCleanup() {
+    const cleanup = async () => {
+      try {
+        const now = Date.now();
 
-  setTimeout(periodicCleanup, PERF_CONFIG.CLEANUP_INTERVAL);
-}
-
-// Start monitoring
-logResourceUsage();
-periodicCleanup();
-
-/**
- * Destroys a torrent and returns its path for cleanup with optimized cleanup
- * @param {string} magnet - Magnet URI
- */
-function destroyTorrent(magnet) {
-  if (!magnet || !torrents[magnet]) return null;
-
-  const state = torrents[magnet];
-  let torrentPath = null;
-
-  // Clear auto-delete timer if it exists
-  if (state.deleteTimer) {
-    clearTimeout(state.deleteTimer);
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Cleared auto-delete timer for:", magnet);
-    }
-  }
-
-  if (state.torrent) {
-    // Get the path before destroying
-    torrentPath = state.torrent.path;
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Destroying torrent at path:", torrentPath);
-    }
-
-    // Remove torrent with proper cleanup
-    try {
-      client.remove(magnet, { destroyStore: true }, () => {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Torrent removed from client");
+        // Cleanup inactive torrents
+        for (const [magnet, state] of this.torrents.entries()) {
+          if (state.isInactive() && !state.deleteTimer) {
+            logger.info("Removing inactive torrent");
+            await this.destroyTorrent(magnet);
+          }
         }
-      });
-    } catch (error) {
-      console.error(`Error removing torrent ${magnet}:`, error);
-    }
+
+        // Clean cache
+        const cacheEntries = Array.from(this.cache.cache.entries());
+        for (const [magnet, item] of cacheEntries) {
+          if (now - item.cachedAt > TORRENT_CONFIG.CACHE_CLEANUP_AGE) {
+            this.cache.delete(magnet);
+          }
+        }
+      } catch (error) {
+        logger.error("Error in periodic cleanup", error);
+      }
+    };
+
+    cleanup(); // Run immediately
+    this.cleanupInterval = setInterval(cleanup, FS_CONFIG.CLEANUP_INTERVAL);
   }
 
-  // Clean up from cache
-  torrentCache.delete(magnet);
+  /**
+   * Shutdown service gracefully
+   */
+  async shutdown() {
+    logger.info("Shutting down torrent service");
 
-  // Clean up the state
-  delete torrents[magnet];
+    // Clear intervals
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+    }
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
 
-  return torrentPath;
-}
+    // Destroy all torrents
+    const magnets = Array.from(this.torrents.keys());
+    for (const magnet of magnets) {
+      await this.destroyTorrent(magnet);
+    }
 
-/**
- * Extend auto-delete timer for a torrent (reset to 72 hours from now)
- * @param {string} magnet - Magnet URI
- */
-function extendAutoDelete(magnet) {
-  if (!magnet || !torrents[magnet]) return;
-
-  const state = torrents[magnet];
-
-  // Clear existing timer
-  if (state.deleteTimer) {
-    clearTimeout(state.deleteTimer);
-  }
-
-  // Set new timer
-  const timer = setTimeout(() => {
-    console.log(`Auto-deleting torrent after 72 hours: ${magnet}`);
-    const torrentPath = destroyTorrent(magnet);
-    if (torrentPath) {
-      import("fs").then(({ rm }) => {
-        rm(torrentPath, { recursive: true, force: true })
-          .then(() => console.log(`Auto-deleted: ${torrentPath}`))
-          .catch((err) => console.error(`Failed to auto-delete: ${err}`));
+    // Destroy client
+    if (this.client) {
+      await new Promise((resolve) => {
+        this.client.destroy(resolve);
       });
     }
-  }, AUTO_DELETE_DELAY);
 
-  state.deleteTimer = timer;
-  console.log(`Auto-delete timer extended for ${magnet} (72 hours from now)`);
+    this.cache.clear();
+    this.isInitialized = false;
+
+    logger.info("Torrent service shut down successfully");
+  }
+
+  /**
+   * Get service statistics
+   */
+  getStats() {
+    return {
+      activeTorrents: this.torrents.size,
+      cacheSize: this.cache.size,
+      isInitialized: this.isInitialized,
+      downloadDir: this.downloadDir,
+    };
+  }
 }
 
-export { client, torrents, getOrAddTorrent, destroyTorrent, extendAutoDelete };
+// Create singleton instance
+const torrentService = new TorrentService();
+
+// Export instance and class
+export { torrentService, TorrentService };
+export default torrentService;

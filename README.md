@@ -6,7 +6,7 @@
 [![WebTorrent](https://img.shields.io/badge/WebTorrent-2.6-blue.svg)](https://webtorrent.io/)
 [![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
-> A modern, cross-platform video player for streaming MKV/MP4 files directly from BitTorrent magnets with instant playback, multi-track audio/subtitle support, and professional ASS/SSA subtitle rendering. Available as both a web application and native desktop app.
+> A sophisticated, cross-platform video player for streaming MKV/MP4 files directly from BitTorrent magnets with instant playback, intelligent resource management, multi-track audio/subtitle support, and professional ASS/SSA subtitle rendering. Features a modular ES6 architecture with unified loading overlay system. Available as both a web application and native desktop app.
 
 ## 🎯 Deployment Options
 
@@ -15,12 +15,14 @@
 - Traditional Node.js web server accessible via browser
 - Perfect for server deployments and remote access
 - Access via `http://localhost:3000`
+- Smart resource polling with NOT_READY detection
 
 ### 🖥️ **Desktop Application**
 
 - Native Electron desktop app with system integration
 - Embedded web server with automatic startup/shutdown
 - Native menus, dialogs, and window management
+- Cross-platform: Windows, macOS, Linux
 
 ## ✨ Key Features
 
@@ -29,6 +31,7 @@
 - **Instant Playback**: Streaming starts with just 256KB downloaded
 - **Progressive Loading**: No waiting for complete downloads
 - **Smart Piece Selection**: Prioritizes first 20 pieces containing video metadata
+- **Intelligent Resource Polling**: Detects NOT_READY server responses and waits for sufficient torrent data
 - **Multi-format Support**: MKV, MP4, and other common video formats
 - **HTTP Range Requests**: Efficient seeking and bandwidth usage
 - **Magnet Validation**: Built-in BitTorrent magnet link validation
@@ -36,29 +39,34 @@
 
 ### 🎵 **Multi-Track Audio Support**
 
-- **Audio Track Selection**: Switch between multiple audio languages seamlessly
-- **Real-time Transcoding**: FFmpeg-powered audio track conversion to WebM/Opus
+- **Seamless Track Switching**: Switch between multiple audio languages with zero interruption
+- **Real-time Transcoding**: FFmpeg-powered audio conversion to WebM/Opus
 - **Language Detection**: Automatic audio track language identification using FFprobe
-- **Custom UI**: Plyr-styled audio selector with microphone icon
+- **Unified Loading Overlay**: Consistent visual feedback during audio transcoding
+- **Playback Position Restoration**: Automatically resumes at exact position after track change
 - **Synchronization**: Audio timing offset detection for perfect sync
+- **Custom UI**: Plyr-styled audio selector with microphone icon
 
 ### 🎭 **Professional Subtitle System**
 
-- **Multi-track Support**: Switch between multiple subtitle languages
+- **Multi-track Support**: Switch between multiple subtitle languages seamlessly
 - **ASS/SSA Rendering**: Advanced subtitle formatting with SubtitlesOctopus and libass-wasm
 - **Real-time Extraction**: On-demand subtitle extraction from MKV files using FFmpeg
 - **Format Support**: ASS, SSA, VTT, SRT, SUB with automatic conversion
 - **Smart Updates**: Intelligent subtitle refresh with content hash detection
 - **Custom Fonts**: Includes Arial Bold and Japanese (NotoSansJP) fonts
 - **Fallback System**: Graceful degradation when subtitles unavailable
+- **Unified Overlay Integration**: Consistent loading feedback across all subtitle operations
 
 ### 🎮 **Modern Player Interface**
 
+- **Unified Overlay System**: Single, centralized loading overlay with stage-specific messages
+- **OverlayManager Architecture**: Modular overlay management for all loading states
 - **Plyr Integration**: Beautiful, responsive HTML5 video player
-- **Custom Controls**: CC button, audio selector, quality indicator, and fullscreen
+- **Custom Controls**: CC button, audio selector, quality indicator, fullscreen
 - **Context Menu**: Right-click for real-time status (buffer, download progress, subtitle status)
 - **Resume Functionality**: Continue where you left off or restart from beginning
-- **Loading Overlays**: Smooth transitions with visual feedback
+- **Smooth Transitions**: Visual feedback for video loading, audio switching, subtitle changes
 - **Fullscreen Ready**: All controls work seamlessly in fullscreen mode
 - **Torrent File Support**: Drag-and-drop .torrent files with automatic magnet generation
 
@@ -82,12 +90,13 @@
 
 ### 🛠️ **Developer Experience**
 
-- **Live System Monitoring**: Real-time stats at `/sysinfo`
+- **ES6 Module Architecture**: Clean, modular codebase with proper imports/exports
+- **Class-based Frontend**: Organized player logic with dedicated controller classes
 - **Centralized Configuration**: Modular config in `configs/all.config.js`
+- **Unified Overlay System**: Single source of truth for all loading states
+- **Live System Monitoring**: Real-time stats at `/sysinfo`
 - **Comprehensive Logging**: Debug mode with detailed output
 - **Modular Architecture**: Clean separation of concerns with dedicated folders
-- **ES6 Modules**: Modern JavaScript with proper imports/exports
-- **Class-based Frontend**: Organized player logic with UIController, SubtitlesManager, etc.
 
 ## 🏗 Architecture Overview
 
@@ -132,15 +141,30 @@ MKV-Player-WebTorrent/
 │   └── security.js               # Security middleware & rate limiting
 │
 ├── 📂 libs/                      # Frontend assets & libraries
-│   ├── player.js                 # Main player application logic (4200+ lines)
+│   ├── player.js                 # Main player entry point with module orchestration
 │   ├── torrentPraser.js          # Parse .torrent files to get magnet
+│   │
+│   ├── 📂 modules/               # ES6 Module classes (NEW)
+│   │   ├── OverlayManager.js        # Unified overlay management
+│   │   ├── VideoPlayerController.js # Main player orchestration
+│   │   ├── UIController.js          # DOM manipulation & interface updates
+│   │   ├── SubtitlesManager.js      # Multi-track subtitle handling
+│   │   ├── AudioManager.js          # Audio track switching & transcoding
+│   │   ├── StatusPoller.js          # Torrent status polling
+│   │   ├── ResourceLoader.js        # Video/subtitle resource loading with NOT_READY detection
+│   │   ├── RetryController.js       # Exponential backoff retry logic
+│   │   ├── FullscreenController.js  # Fullscreen mode management
+│   │   └── Config.js                # Frontend constants & configuration
+│   │
 │   ├── 📂 styles/                # CSS stylesheets
 │   │   ├── style.css             # Custom UI styles
 │   │   ├── embed.css             # Embed player styles
 │   │   └── plyr.css              # Plyr video player styles
+│   │
 │   ├── 📂 fonts/                 # Subtitle font files
 │   │   ├── ARIALBD.TTF           # Arial Bold font for subtitles
 │   │   └── NotoSansJP-Bold.ttf   # Japanese subtitle font
+│   │
 │   └── 📂 octopus/               # SubtitlesOctopus renderer
 │       ├── subtitles-octopus.js  # ASS/SSA subtitle renderer
 │       ├── subtitles-octopus-worker.js
@@ -149,24 +173,151 @@ MKV-Player-WebTorrent/
 │
 └── 📂 views/                     # EJS template files
     ├── index.ejs                 # Home page template
-    ├── player.ejs                # Video player interface
+    ├── player.ejs                # Video player interface with #overlay element
     ├── embed.ejs                 # Embeddable player view
     └── sysinfo.ejs               # System monitoring dashboard
 ```
 
+### 🎯 Module Architecture (libs/modules/)
+
+#### Core Controllers
+
+**OverlayManager.js** - Unified Loading Overlay System
+
+- Manages single `#overlay` DOM element for all loading states
+- Provides consistent visual feedback across video loading, audio switching, subtitle changes
+- Creates spinner and message elements dynamically with CSS flexbox centering
+- Methods: `initialize()`, `show(message)`, `hide()`, `createSpinner()`, `createMessage()`
+- Single source of truth for all loading indicators
+
+**VideoPlayerController.js** - Main Player Orchestration
+
+- Primary controller coordinating all player operations
+- Manages player initialization sequence with metadata waiting
+- Coordinates video loading, audio detection, subtitle detection
+- Implements `_audioSwitchInProgress` flag to prevent overlay conflicts
+- Event handlers: `handleVideoLoadStart()`, `handleVideoLoadedMetadata()`, `handleVideoError()`
+- Uses unified overlay for all feedback
+
+**UIController.js** - Interface Management
+
+- DOM manipulation and element updates
+- Player control customization (CC button, audio selector, quality indicator)
+- Context menu implementation with real-time status
+- Watermark management
+- Plyr player integration and customization
+
+**ResourceLoader.js** - Intelligent Resource Loading
+
+- Polls server endpoints until resources are ready
+- **NOT_READY Detection**: Checks for server "NOT_READY" text responses (HTTP 200)
+- Distinguishes between text responses (not ready) and binary video data (ready)
+- Returns URL strings (not Response objects) for video sources
+- Exponential backoff with configurable timeout
+- Used for video and subtitle resource loading
+
+**AudioManager.js** - Multi-track Audio Handling
+
+- Detects available audio tracks using FFprobe data
+- Creates custom audio selector UI with language labels
+- Handles audio track switching with FFmpeg transcoding to WebM/Opus
+- Restores playback position after track change
+- Uses unified overlay: `window.player.ui.overlay.show('Switching audio track...')`
+- Timeout fallback for cleanup (5 seconds)
+
+**SubtitlesManager.js** - Subtitle Track Management
+
+- Multi-track subtitle detection and switching
+- SubtitlesOctopus integration for ASS/SSA rendering
+- Real-time subtitle extraction from MKV files
+- Font loading (Arial Bold, NotoSansJP)
+- Smart subtitle updates with content hash comparison
+- Uses unified overlay: `this.uiController?.overlay.show('Loading subtitles...')`
+
+**StatusPoller.js** - Torrent Status Monitoring
+
+- Continuous polling of torrent download status
+- Updates context menu with real-time progress
+- Monitors buffer levels, download speed, peer count
+- Configurable poll interval (default: 600ms)
+
+**RetryController.js** - Retry Logic
+
+- Exponential backoff for failed operations
+- Configurable max retries and delay limits
+- Used by ResourceLoader for persistent polling
+
+**FullscreenController.js** - Fullscreen Mode
+
+- Manages fullscreen state transitions
+- Handles overlay visibility in fullscreen
+- Ensures controls remain accessible
+
 ### Technology Stack
 
-| Component            | Technology                  | Purpose                                 |
-| -------------------- | --------------------------- | --------------------------------------- |
-| **Backend**          | Node.js + Express 5.x       | HTTP server & API endpoints             |
-| **Desktop App**      | Electron 39+                | Native cross-platform desktop wrapper   |
-| **Security**         | Helmet + express-rate-limit | Security headers & smart rate limiting  |
-| **Streaming**        | WebTorrent 2.6              | P2P video streaming                     |
-| **Video Processing** | FFmpeg + fluent-ffmpeg      | Subtitle extraction & audio transcoding |
-| **Frontend**         | Vanilla JS + EJS            | Responsive UI with ES6 modules          |
-| **Video Player**     | Plyr                        | Modern HTML5 video player               |
-| **Subtitles**        | SubtitlesOctopus + libass   | Advanced ASS/SSA subtitle rendering     |
-| **Compression**      | gzip                        | Response compression                    |
+| Component            | Technology                  | Purpose                                   |
+| -------------------- | --------------------------- | ----------------------------------------- |
+| **Backend**          | Node.js + Express 5.x       | HTTP server & API endpoints               |
+| **Desktop App**      | Electron 39+                | Native cross-platform desktop wrapper     |
+| **Security**         | Helmet + express-rate-limit | Security headers & smart rate limiting    |
+| **Streaming**        | WebTorrent 2.6              | P2P video streaming                       |
+| **Video Processing** | FFmpeg + fluent-ffmpeg      | Subtitle extraction & audio transcoding   |
+| **Frontend**         | Vanilla JS + ES6 Modules    | Modular architecture with dynamic imports |
+| **Video Player**     | Plyr                        | Modern HTML5 video player                 |
+| **Subtitles**        | SubtitlesOctopus + libass   | Advanced ASS/SSA subtitle rendering       |
+| **Compression**      | gzip                        | Response compression                      |
+
+### 🔄 Loading Sequence Flow
+
+1. **Player Initialization** (`VideoPlayerController.initialize()`)
+   - Show overlay: "Initializing player..."
+   - Wait for video metadata event (`loadedmetadata`) with 10s timeout
+   - Proceed to resource checks
+
+2. **Subtitle Detection** (2 attempts, `SubtitlesManager`)
+   - Show overlay: "Loading subtitles..."
+   - Poll `/subtitle-tracks` endpoint
+   - Extract and render ASS/SSA subtitles
+   - Hide overlay on success
+
+3. **Audio Detection** (2 attempts, `AudioManager`)
+   - Poll `/audio-tracks` endpoint
+   - Create audio selector UI if multiple tracks found
+   - Ready for playback
+
+4. **Video Loading** (`ResourceLoader`)
+   - Poll `/video` endpoint until ready
+   - Check for "NOT_READY" text response
+   - Return URL when binary video data available
+   - Set `video.src` and begin playback
+
+5. **Audio Switching** (when user changes track)
+   - Set `_audioSwitchInProgress = true` flag
+   - Show overlay: "Switching audio track..." / "Transcoding audio..."
+   - Poll `/video?audioTrack=N` with ResourceLoader
+   - Restore playback position
+   - Hide overlay, set `_audioSwitchInProgress = false`
+
+### 🎯 Unified Overlay System
+
+**Key Innovation**: Single `#overlay` DOM element in `player.ejs` managed by `OverlayManager`
+
+**Benefits**:
+
+- No duplicate loading indicators
+- Consistent styling and positioning
+- Centralized message updates
+- Works across video loading, audio switching, subtitle changes
+- Prevents overlay conflicts during operations
+
+**Implementation**:
+
+```javascript
+// All modules access via:
+const overlay = window.player?.ui?.overlay;
+overlay.show("Loading message...");
+overlay.hide();
+```
 
 ## 🚀 Quick Start
 
@@ -632,13 +783,15 @@ node launcher.js electron    # Desktop app
 
 ### Class Architecture (Frontend)
 
-The frontend uses a sophisticated class-based architecture:
+The frontend uses a sophisticated class-based ES6 module architecture with dynamic imports:
 
-- **VideoPlayerController** - Main orchestrator class
+- **VideoPlayerController** - Main orchestrator coordinating all operations
+- **OverlayManager** - Unified loading overlay for all states
 - **UIController** - DOM manipulation and interface updates
 - **SubtitlesManager** - Multi-track subtitle handling with SubtitlesOctopus
+- **AudioManager** - Audio track detection and switching with transcoding
 - **StatusPoller** - Torrent status and progress monitoring
-- **ResourceLoader** - Video and subtitle resource loading
+- **ResourceLoader** - Intelligent video/subtitle loading with NOT_READY detection
 - **RetryController** - Exponential backoff retry logic
 - **FullscreenController** - Fullscreen mode overlay management
 

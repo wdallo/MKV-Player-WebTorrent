@@ -239,7 +239,7 @@ app.on(
       // In production, use default behavior
       callback(false);
     }
-  }
+  },
 );
 
 // Security: Prevent new window creation

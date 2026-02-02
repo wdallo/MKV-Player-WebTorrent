@@ -3,7 +3,7 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import ffprobe from "ffprobe";
 import ffprobeStatic from "ffprobe-static";
-import { getOrAddTorrent } from "../services/torrentService.js";
+import { torrentService } from "../services/torrentService.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -15,53 +15,69 @@ const DEFAULT_TRACK_INDEX = 0;
 export async function listSubtitleTracks(req, res) {
   const magnet = req.query.url;
   if (!magnet) return res.status(400).send("Missing url param");
-  const state = getOrAddTorrent(magnet);
-  if (!state || !state.videoFile) {
-    res.status(200).send("NOT_READY");
-    return;
-  }
-  const videoFile = state.videoFile;
-
-  // If not an MKV file, return empty tracks array
-  if (!videoFile.name.endsWith(".mkv")) {
-    res.json([]);
-    return;
-  }
 
   try {
-    // Use the video stream URL instead of file path for WebTorrent
-    const videoUrl = `http://localhost:${
-      process.env.PORT || 3000
-    }/video?url=${encodeURIComponent(magnet)}`;
+    const state = await torrentService.getOrAddTorrent(magnet);
+    if (!state || !state.videoFile) {
+      res.status(200).send("NOT_READY");
+      return;
+    }
+    const videoFile = state.videoFile;
 
-    const info = await ffprobe(videoUrl, {
-      path: ffprobeStatic.path,
-      timeout: FFPROBE_TIMEOUT,
-    });
+    // If not an MKV file, return empty tracks array
+    if (!videoFile.name.endsWith(".mkv")) {
+      res.json([]);
+      return;
+    }
 
-    const tracks = info.streams
-      .filter((s) => s.codec_type === "subtitle")
-      .map((s, i) => ({
-        index: i,
-        language: s.tags?.language || "und",
-        title: s.tags?.title || `Subtitle ${i + 1}`,
-        codec: s.codec_name,
-      }));
+    try {
+      // Use the video stream URL instead of file path for WebTorrent
+      const videoUrl = `http://localhost:${
+        process.env.PORT || 3000
+      }/video?url=${encodeURIComponent(magnet)}`;
 
-    console.log(`Found ${tracks.length} subtitle tracks:`, tracks);
-    res.json(tracks);
-  } catch (e) {
-    console.error("Failed to probe subtitles:", e.message);
-    // Return empty array instead of error to allow graceful fallback
+      const info = await ffprobe(videoUrl, {
+        path: ffprobeStatic.path,
+        timeout: FFPROBE_TIMEOUT,
+      });
+
+      const tracks = info.streams
+        .filter((s) => s.codec_type === "subtitle")
+        .map((s, i) => ({
+          index: i,
+          language: s.tags?.language || "und",
+          title: s.tags?.title || `Subtitle ${i + 1}`,
+          codec: s.codec_name,
+        }));
+
+      console.log(`Found ${tracks.length} subtitle tracks:`, tracks);
+      res.json(tracks);
+    } catch (e) {
+      console.error("Failed to probe subtitles:", e.message, e.stack);
+      // Return empty array instead of error to allow graceful fallback
+      res.json([]);
+    }
+  } catch (error) {
+    console.error("Error in listSubtitleTracks:", error.message, error.stack);
     res.json([]);
   }
 }
 
 // Streams ASS/SSA subtitles extracted from MKV video or returns a fallback if not available
-export function streamAssSubtitles(req, res) {
+export async function streamAssSubtitles(req, res) {
   const magnet = req.query.url;
   if (!magnet) return res.status(400).send("Missing url param");
-  const state = getOrAddTorrent(magnet);
+
+  let state;
+  try {
+    state = await torrentService.getOrAddTorrent(magnet);
+  } catch (error) {
+    console.error("Error getting torrent for subtitles:", error.message);
+    const fallbackAss = `[Script Info]\nTitle: Error Loading Subtitles\nScriptType: v4.00+\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:05.00,Default,,0,0,0,,Error loading subtitles`;
+    res.setHeader("Content-Type", "text/x-ssa");
+    return res.send(fallbackAss);
+  }
+
   if (!state || !state.videoFile) {
     res.status(200).send("NOT_READY");
     return;
@@ -114,10 +130,18 @@ export function streamAssSubtitles(req, res) {
 }
 
 // Streams VTT subtitles, converting from other formats if needed, or extracts from MKV
-export function streamVttSubtitles(req, res) {
+export async function streamVttSubtitles(req, res) {
   const magnet = req.query.url;
   if (!magnet) return res.status(400).send("Missing url param");
-  const state = getOrAddTorrent(magnet);
+
+  let state;
+  try {
+    state = await torrentService.getOrAddTorrent(magnet);
+  } catch (error) {
+    console.error("Error getting torrent for VTT subtitles:", error.message);
+    return res.status(200).send("NOT_READY");
+  }
+
   if (!state || !state.videoFile) {
     res.status(200).send("NOT_READY");
     return;
@@ -132,7 +156,7 @@ export function streamVttSubtitles(req, res) {
       // Try to find another subtitle file format
       const subExts = [".srt", ".sub", ".ssa", ".txt", ".ass"];
       otherSubFile = torrent.files.find((f) =>
-        subExts.some((ext) => f.name.toLowerCase().endsWith(ext))
+        subExts.some((ext) => f.name.toLowerCase().endsWith(ext)),
       );
     }
   }

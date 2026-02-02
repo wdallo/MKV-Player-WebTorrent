@@ -4,7 +4,8 @@ import ffmpegPath from "ffmpeg-static";
 import ffprobe from "ffprobe";
 import ffprobeStatic from "ffprobe-static";
 import path from "path";
-import { getOrAddTorrent } from "../services/torrentService.js";
+import fs from "fs";
+import { torrentService } from "../services/torrentService.js";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -18,7 +19,14 @@ export async function listAudioTracks(req, res) {
   const magnet = req.query.url;
   if (!magnet) return res.status(400).send("Missing url param");
 
-  const state = getOrAddTorrent(magnet);
+  let state;
+  try {
+    state = await torrentService.getOrAddTorrent(magnet);
+  } catch (error) {
+    console.error("Error getting torrent for audio tracks:", error.message);
+    return res.json([]);
+  }
+
   if (!state || !state.videoFile) {
     res.status(200).send("NOT_READY");
     return;
@@ -38,6 +46,12 @@ export async function listAudioTracks(req, res) {
 
     // Check if enough of the file is downloaded for ffprobe analysis
     if (videoFile.downloaded < MIN_DOWNLOAD_SIZE) {
+      res.json([]);
+      return;
+    }
+
+    // Check if file actually exists on disk
+    if (!fs.existsSync(downloadPath)) {
       res.json([]);
       return;
     }
@@ -70,13 +84,20 @@ export async function listAudioTracks(req, res) {
 }
 
 // Stream specific audio track as WebM/Opus for web compatibility
-export function streamAudioTrack(req, res) {
+export async function streamAudioTrack(req, res) {
   const magnet = req.query.url;
   const trackIndex = parseInt(req.query.track) || DEFAULT_TRACK_INDEX;
 
   if (!magnet) return res.status(400).send("Missing url param");
 
-  const state = getOrAddTorrent(magnet);
+  let state;
+  try {
+    state = await torrentService.getOrAddTorrent(magnet);
+  } catch (error) {
+    console.error("Error getting torrent for audio streaming:", error.message);
+    return res.status(200).send("NOT_READY");
+  }
+
   if (!state || !state.videoFile) {
     res.status(200).send("NOT_READY");
     return;
@@ -143,7 +164,14 @@ export async function getAudioTimingOffset(req, res) {
 
   if (!magnet) return res.status(400).send("Missing url param");
 
-  const state = getOrAddTorrent(magnet);
+  let state;
+  try {
+    state = await torrentService.getOrAddTorrent(magnet);
+  } catch (error) {
+    console.error("Error getting torrent for audio timing:", error.message);
+    return res.status(200).send("NOT_READY");
+  }
+
   if (!state || !state.videoFile) {
     return res.status(200).send("NOT_READY");
   }
@@ -159,6 +187,11 @@ export async function getAudioTimingOffset(req, res) {
   try {
     // Use the download path for ffprobe
     const downloadPath = path.join(process.cwd(), "downloads", videoFile.name);
+
+    // Check if file exists on disk
+    if (!fs.existsSync(downloadPath)) {
+      return res.status(200).send("NOT_READY");
+    }
 
     const info = await ffprobe(downloadPath, {
       path: ffprobeStatic.path,
