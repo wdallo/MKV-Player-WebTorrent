@@ -1,4 +1,12 @@
-import { app, BrowserWindow, Menu, dialog, shell, ipcMain } from "electron";
+import {
+  app,
+  BrowserWindow,
+  BrowserView,
+  Menu,
+  dialog,
+  shell,
+  ipcMain,
+} from "electron";
 import { fileURLToPath } from "url";
 import path from "path";
 import { spawn } from "child_process";
@@ -9,6 +17,7 @@ const __dirname = path.dirname(__filename);
 
 // Keep a global reference of the window object
 let mainWindow;
+let browserView = null;
 let serverProcess = null;
 const PORT = process.env.PORT || 3000;
 const isDev = process.env.ELECTRON_IS_DEV === "1";
@@ -38,6 +47,8 @@ async function createWindow() {
       contextIsolation: true,
       enableRemoteModule: false,
       webSecurity: true,
+      webviewTag: true, // Enable <webview> tag
+      preload: path.join(__dirname, "preload.js"), // We'll create this
     },
     show: false, // Don't show until ready
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
@@ -65,6 +76,20 @@ async function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
     stopServer();
+  });
+
+  // Handle window resize to adjust BrowserView
+  mainWindow.on("resize", () => {
+    if (browserView) {
+      const [width, height] = mainWindow.getContentSize();
+      const topOffset = 200;
+      browserView.setBounds({
+        x: 0,
+        y: topOffset,
+        width: width,
+        height: height - topOffset,
+      });
+    }
   });
 
   // Handle external links
@@ -138,6 +163,15 @@ function createMenu() {
       label: "View",
       submenu: [
         {
+          label: "Toggle Developer Tools",
+          accelerator:
+            process.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",
+          click: () => {
+            mainWindow.webContents.toggleDevTools();
+          },
+        },
+        { type: "separator" },
+        {
           label: "Toggle Fullscreen",
           accelerator: process.platform === "darwin" ? "Ctrl+Command+F" : "F11",
           click: () => {
@@ -197,6 +231,267 @@ ipcMain.handle("show-save-dialog", async (event, options) => {
   const result = await dialog.showSaveDialog(mainWindow, options);
   return result;
 });
+
+// Handle browser view for embedded browsing
+ipcMain.handle("load-browser-url", async (event, url) => {
+  if (!mainWindow) return { success: false, error: "Window not available" };
+
+  try {
+    // Create browser view if it doesn't exist
+    if (!browserView) {
+      browserView = new BrowserView({
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
+      mainWindow.setBrowserView(browserView);
+    }
+
+    // Initial bounds - will be updated by renderer with exact offset
+    const [width, height] = mainWindow.getContentSize();
+    browserView.setBounds({
+      x: 0,
+      y: 0,
+      width: width,
+      height: height,
+    });
+    browserView.setAutoResize({
+      width: true,
+      height: true,
+    });
+
+    // Load URL
+    await browserView.webContents.loadURL(url);
+
+    // Listen for console messages from injected script
+    browserView.webContents.on(
+      "console-message",
+      (event, level, message, line, sourceId) => {
+        if (message.startsWith("MKV_PLAY:")) {
+          const magnetUrl = message.replace("MKV_PLAY:", "");
+          if (mainWindow) {
+            mainWindow.loadURL(
+              `http://localhost:${PORT}/player?url=${encodeURIComponent(magnetUrl)}`,
+            );
+          }
+        }
+      },
+    );
+
+    // Inject script to add play buttons next to magnet links
+    browserView.webContents.on("did-finish-load", () => {
+      injectMagnetButtons();
+    });
+
+    // Also inject on navigation
+    browserView.webContents.on("did-navigate-in-page", () => {
+      injectMagnetButtons();
+    });
+
+    // Intercept magnet links - prevent OS from opening them
+    browserView.webContents.on("will-navigate", (event, navigationUrl) => {
+      if (navigationUrl.startsWith("magnet:")) {
+        event.preventDefault();
+        if (mainWindow) {
+          mainWindow.loadURL(
+            `http://localhost:${PORT}/player?url=${encodeURIComponent(navigationUrl)}`,
+          );
+        }
+      }
+    });
+
+    // Also handle new-window events for magnet links
+    browserView.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith("magnet:")) {
+        if (mainWindow) {
+          mainWindow.loadURL(
+            `http://localhost:${PORT}/player?url=${encodeURIComponent(url)}`,
+          );
+        }
+        return { action: "deny" };
+      }
+      return { action: "deny" };
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Function to inject play buttons next to magnet links
+function injectMagnetButtons() {
+  if (!browserView) return;
+
+  const injectionScript = `
+    (function() {
+      // Remove existing buttons first
+      document.querySelectorAll('.mkv-play-btn').forEach(btn => btn.remove());
+      
+      // Add CSS for play buttons
+      if (!document.getElementById('mkv-play-style')) {
+        const style = document.createElement('style');
+        style.id = 'mkv-play-style';
+        style.textContent = \`
+          .mkv-play-btn {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 4px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            vertical-align: middle;
+          }
+          .mkv-play-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+          }
+          .mkv-play-btn:active {
+            transform: translateY(0);
+          }
+        \`;
+        document.head.appendChild(style);
+      }
+      
+      // Find all magnet links and add play buttons
+      const magnetLinks = document.querySelectorAll('a[href^="magnet:"]');
+      
+      magnetLinks.forEach(link => {
+        // Skip if button already exists
+        if (link.nextElementSibling && link.nextElementSibling.classList.contains('mkv-play-btn')) {
+          return;
+        }
+        
+        const playBtn = document.createElement('button');
+        playBtn.className = 'mkv-play-btn';
+        playBtn.innerHTML = '▶ Play';
+        playBtn.onclick = function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const magnetUrl = link.getAttribute('href');
+          
+          // Send via console message to avoid OS intercepting magnet URL
+          console.log('MKV_PLAY:' + magnetUrl);
+        };
+        
+        // Insert after the link
+        link.parentNode.insertBefore(playBtn, link.nextSibling);
+      });
+      
+      // Monitor for dynamically added magnet links
+      const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1) {
+              const newMagnetLinks = node.querySelectorAll ? node.querySelectorAll('a[href^="magnet:"]') : [];
+              newMagnetLinks.forEach(link => {
+                if (!link.nextElementSibling || !link.nextElementSibling.classList.contains('mkv-play-btn')) {
+                  const playBtn = document.createElement('button');
+                  playBtn.className = 'mkv-play-btn';
+                  playBtn.innerHTML = '▶ Play';
+                  playBtn.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const magnetUrl = link.getAttribute('href');
+                    console.log('MKV_PLAY:' + magnetUrl);
+                  };
+                  link.parentNode.insertBefore(playBtn, link.nextSibling);
+                }
+              });
+            }
+          });
+        });
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    })();
+  `;
+
+  browserView.webContents.executeJavaScript(injectionScript).catch((err) => {
+    console.error("Failed to inject script:", err);
+  });
+}
+
+// Handle custom protocol from injected buttons
+ipcMain.handle("load-magnet-from-browser", async (event, magnetUrl) => {
+  if (mainWindow) {
+    // Load the player with the magnet URL
+    mainWindow.loadURL(
+      `http://localhost:${PORT}/player?url=${encodeURIComponent(magnetUrl)}`,
+    );
+  }
+  return { success: true };
+});
+
+ipcMain.handle("close-browser-view", async () => {
+  if (browserView && mainWindow) {
+    mainWindow.removeBrowserView(browserView);
+    browserView.webContents.close();
+    browserView = null;
+  }
+  return { success: true };
+});
+
+ipcMain.handle("browser-navigate", async (event, action) => {
+  if (!browserView) return { success: false };
+
+  try {
+    switch (action) {
+      case "back":
+        if (browserView.webContents.canGoBack()) {
+          browserView.webContents.goBack();
+        }
+        break;
+      case "forward":
+        if (browserView.webContents.canGoForward()) {
+          browserView.webContents.goForward();
+        }
+        break;
+      case "refresh":
+        browserView.webContents.reload();
+        break;
+    }
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("open-external", async (event, url) => {
+  shell.openExternal(url);
+  return { success: true };
+});
+
+// Get toolbar height from renderer
+ipcMain.handle(
+  "set-browser-view-offset",
+  async (event, offset, placeholderHeight) => {
+    if (browserView && mainWindow) {
+      const [width] = mainWindow.getContentSize();
+      // Use placeholderHeight if provided
+      const viewHeight = placeholderHeight || 600; // Default fallback
+      browserView.setBounds({
+        x: 0,
+        y: offset,
+        width: width,
+        height: viewHeight,
+      });
+    }
+    return { success: true };
+  },
+);
 
 // App event handlers
 app.whenReady().then(async () => {

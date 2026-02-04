@@ -88,6 +88,16 @@
 - **Custom Dialogs**: Native input dialogs for magnet links
 - **Cross-platform**: Windows, macOS, and Linux support
 
+### 🌐 **Integrated Torrent Browser** (Electron Only)
+
+- **In-App Browsing**: Embedded webview for browsing torrent sites directly
+- **One-Click Play**: Purple "▶ Play" buttons automatically injected next to all magnet links
+- **Quick Links**: Pre-configured buttons for SubsPlease, Nyaa.si, 1337x, TPB
+- **Custom Scrollbar**: Styled scrollbars for better visual integration
+- **Navigation Controls**: Back, forward, refresh, and URL bar
+- **Console-Based Protocol**: Bypasses OS magnet handler for seamless in-app loading
+- **Electron Exclusive**: Browse Sites tab only appears in desktop app, hidden in web mode
+
 ### 🛠️ **Developer Experience**
 
 - **ES6 Module Architecture**: Clean, modular codebase with proper imports/exports
@@ -107,6 +117,7 @@ MKV-Player-WebTorrent/
 │
 ├── 📄 app.js                     # Main Express server application
 ├── 📄 electron-main.js           # Electron main process (desktop app)
+├── 📄 preload.js                 # Electron preload script with contextBridge
 ├── 📄 launcher.js                # Universal launcher (web/desktop/dev)
 ├── 📄 package.json               # Dependencies & scripts
 ├── 📄 package-lock.json          # Dependency lock file
@@ -171,8 +182,8 @@ MKV-Player-WebTorrent/
 │       ├── subtitles-octopus-worker-legacy.js
 │       └── subtitles-octopus-worker.wasm
 │
-└── 📂 views/                     # EJS template files
-    ├── index.ejs                 # Home page template
+├── 📂 views/                     # EJS template files
+    ├── index.ejs                 # Home page with Browse Sites tab (webview)
     ├── player.ejs                # Video player interface with #overlay element
     ├── embed.ejs                 # Embeddable player view
     └── sysinfo.ejs               # System monitoring dashboard
