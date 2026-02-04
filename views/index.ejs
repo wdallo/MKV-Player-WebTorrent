@@ -6,6 +6,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/libs/styles/style.css" />
     <style>
+      .quick-link-btn-small {
+        background: rgba(102, 126, 234, 0.2);
+        color: white;
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+      .quick-link-btn-small:hover {
+        background: rgba(102, 126, 234, 0.4);
+        border-color: rgba(102, 126, 234, 0.6);
+      }
+      .nav-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .nav-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .nav-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style>
   </head>
   <body>
@@ -14,6 +51,7 @@
       <div class="tabs">
         <button type="button" class="tab-btn active" data-tab="magnet">Magnet URL</button>
         <button type="button" class="tab-btn" data-tab="torrent">Torrent File</button>
+        <button type="button" class="tab-btn" id="browse-tab-btn" data-tab="browser" style="display: none;">Browse Sites</button>
       </div>
       
       <!-- Magnet URL Tab -->
@@ -54,6 +92,67 @@
         </form>
       </div>
 
+      <!-- Browser Tab -->
+      <div id="browser-tab" class="tab-content" style="display: none; flex-direction: column; height: calc(100vh - 120px);">
+        <div class="browser-container" style="max-width: 100%; margin: 0; padding: 0; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+          <!-- Toolbar -->
+          <div style="background: #1e1e1e; padding: 12px 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #333;">
+            <button type="button" id="back-btn" class="nav-btn" title="Back">◄</button>
+            <button type="button" id="forward-btn" class="nav-btn" title="Forward">►</button>
+            <button type="button" id="refresh-btn" class="nav-btn" title="Refresh">⟳</button>
+            <button type="button" id="close-browser-btn" class="nav-btn" title="Close Browser" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.3);">✕</button>
+            <input
+              type="url"
+              id="site-url"
+              placeholder="Enter torrent site URL..."
+              class="magnet-form-input"
+              value="https://subsplease.org"
+              style="flex: 1; margin: 0;"
+            />
+            <button type="button" id="load-site-btn" class="magnet-form-btn" style="margin: 0;">Go</button>
+          </div>
+          
+          <!-- Quick Links Bar -->
+          <div style="background: #252525; padding: 10px 20px; display: flex; gap: 8px; border-bottom: 1px solid #333; overflow-x: auto;">
+            <button type="button" class="quick-link-btn-small" data-url="https://subsplease.org">
+              🌸 SubsPlease
+            </button>
+            <button type="button" class="quick-link-btn-small" data-url="https://nyaa.si">
+              🐱 Nyaa.si
+            </button>
+            <button type="button" class="quick-link-btn-small" data-url="https://1337x.to">
+              ⚡ 1337x
+            </button>
+            <button type="button" class="quick-link-btn-small" data-url="https://thepiratebay.org">
+              🏴‍☠️ TPB
+            </button>
+          </div>
+
+          <!-- Browser View Info -->
+          <div id="browser-active-msg" style="display: none; padding: 15px 20px; background: rgba(16, 185, 129, 0.1); border-bottom: 1px solid rgba(16, 185, 129, 0.3);">
+            <p style="color: #10b981; font-size: 13px; margin: 0;">
+              ✓ <strong>Browser active!</strong> Click the purple "▶ Play" button next to any magnet link to load it directly
+            </p>
+          </div>
+
+          <!-- Browser placeholder -->
+          <div id="browser-placeholder" style="flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; position: relative; overflow: hidden;">
+            <div id="placeholder-text" style="text-align: center; color: #666;">
+              <div style="font-size: 48px; margin-bottom: 20px;">🌐</div>
+              <p style="font-size: 18px; margin-bottom: 10px; color: #aaa;">Click a site above or enter a URL</p>
+              <p style="font-size: 14px;">The browser will appear here</p>
+            </div>
+            <div id="browser-loading" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; align-items: center; justify-content: center; z-index: 10;">
+              <div style="text-align: center;">
+                <div style="width: 50px; height: 50px; border: 4px solid #333; border-top-color: #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <p style="color: #aaa; font-size: 16px;">Loading...</p>
+              </div>
+            </div>
+            <webview  id="browser-webview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;" partition="persist:browser"></webview>
+          </div>
+        </div>
+      </div>
+
       <div id="magnet-error" class="magnet-form-error" style="display: none"></div>
       <div id="loading" class="loading" style="display: none;">
         <p>Parsing torrent file...</p>
@@ -74,8 +173,24 @@
 
       // Initialize when page loads
       document.addEventListener('DOMContentLoaded', function() {
+        // Show Browse Sites tab only in Electron
+        if (window.electronAPI) {
+          document.getElementById('browse-tab-btn').style.display = 'inline-block';
+        }
+        
         torrentParser = new TorrentParser();
         setupEventListeners();
+        
+        // Check if there's a magnet link in the URL query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const magnetUrl = urlParams.get('magnet');
+        if (magnetUrl && magnetUrl.startsWith('magnet:')) {
+          // Auto-fill the magnet input and redirect to player
+          document.getElementById('magnet-url').value = magnetUrl;
+          setTimeout(() => {
+            window.location.href = "/player?url=" + encodeURIComponent(magnetUrl);
+          }, 500);
+        }
       });
 
       function setupEventListeners() {
@@ -86,6 +201,234 @@
             switchTab(tabName);
           });
         });
+
+        // Browser functionality with BrowserView
+        const siteUrlInput = document.getElementById('site-url');
+        const loadSiteBtn = document.getElementById('load-site-btn');
+        const backBtn = document.getElementById('back-btn');
+        const forwardBtn = document.getElementById('forward-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const closeBrowserBtn = document.getElementById('close-browser-btn');
+        
+        let webview = null;
+        let browserActive = false;
+        let loadingTimeout = null;
+
+        async function loadUrl(url) {
+          try {
+            if (!webview) {
+              webview = document.getElementById('browser-webview');
+              
+              // Wait for webview to be ready before setting up listeners
+              await new Promise((resolve) => {
+                if (webview.getWebContentsId) {
+                  resolve();
+                } else {
+                  webview.addEventListener('dom-ready', () => resolve(), { once: true });
+                }
+              });
+              
+              // Setup webview event listeners
+              webview.addEventListener('did-start-loading', () => {
+                document.getElementById('browser-loading').style.display = 'flex';
+                
+                // Clear any existing timeout
+                if (loadingTimeout) clearTimeout(loadingTimeout);
+                
+                // Hide loading after max 3 seconds
+                loadingTimeout = setTimeout(() => {
+                  document.getElementById('browser-loading').style.display = 'none';
+                }, 3000);
+              });
+              
+              webview.addEventListener('did-finish-load', () => {
+                console.log('Page loaded');
+                document.getElementById('browser-loading').style.display = 'none';
+                if (loadingTimeout) clearTimeout(loadingTimeout);
+                injectMagnetButtons();
+              });
+              
+              webview.addEventListener('did-fail-load', () => {
+                document.getElementById('browser-loading').style.display = 'none';
+              });
+              
+              webview.addEventListener('did-navigate-in-page', () => {
+                injectMagnetButtons();
+              });
+              
+              // Listen for console messages from injected script
+              webview.addEventListener('console-message', (e) => {
+                if (e.message && e.message.startsWith('MKV_PLAY:')) {
+                  const magnetUrl = e.message.replace('MKV_PLAY:', '');
+                  window.location.href = `/player?url=${encodeURIComponent(magnetUrl)}`;
+                }
+              });
+              
+              webview.addEventListener('will-navigate', (e) => {
+                if (e.url.startsWith('magnet:')) {
+                  e.preventDefault();
+                }
+              });
+              
+              webview.addEventListener('new-window', (e) => {
+                e.preventDefault();
+                if (e.url.startsWith('magnet:')) {
+                  // Already handled via console-message
+                } else if (e.url.startsWith('http')) {
+                  window.electronAPI?.openExternal(e.url);
+                }
+              });
+            }
+            
+            // Show loading, hide placeholder text
+            document.getElementById('placeholder-text').style.display = 'none';
+            document.getElementById('browser-loading').style.display = 'flex';
+            const placeholder = document.getElementById('browser-placeholder');
+            placeholder.style.alignItems = 'stretch';
+            placeholder.style.justifyContent = 'stretch';
+            webview.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; ';
+            webview.src = url;
+            
+            browserActive = true;
+            document.getElementById('browser-active-msg').style.display = 'block';
+          } catch (error) {
+            console.error('Failed to load URL:', error);
+            showError('Failed to load website: ' + error.message);
+          }
+        }
+        
+        function injectMagnetButtons() {
+          if (!webview) return;
+          
+          const injectionScript = `
+            (function() {
+              if (window.magnetButtonsInjected) return;
+              window.magnetButtonsInjected = true;
+              
+              // Add custom scrollbar styles
+              if (!document.getElementById('mkv-scrollbar-style')) {
+                const scrollbarStyle = document.createElement('style');
+                scrollbarStyle.id = 'mkv-scrollbar-style';
+                scrollbarStyle.textContent = \`
+                  *::-webkit-scrollbar {
+                    width: 10px;
+                    height: 10px;
+                  }
+                  *::-webkit-scrollbar-track {
+                    background: #181818;
+                    border-radius: 5px;
+                  }
+                  *::-webkit-scrollbar-thumb {
+                    background: linear-gradient(135deg, #444, #333);
+                    border-radius: 5px;
+                    border: 1px solid #222;
+                    transition: background 0.2s ease;
+                  }
+                  *::-webkit-scrollbar-thumb:hover {
+                    background: linear-gradient(135deg, #555, #444);
+                    border: 1px solid #333;
+                  }
+                  *::-webkit-scrollbar-thumb:active {
+                    background: linear-gradient(135deg, #666, #555);
+                  }
+                  *::-webkit-scrollbar-corner {
+                    background: #181818;
+                  }
+                \`;
+                document.head.appendChild(scrollbarStyle);
+              }
+              
+              function addPlayButton(link) {
+                if (link.dataset.playButtonAdded) return;
+                link.dataset.playButtonAdded = 'true';
+                
+                const btn = document.createElement('button');
+                btn.textContent = '▶ Play';
+                btn.style.cssText = 'display: inline-block; margin-left: 8px; padding: 4px 12px; background: #8b5cf6; color: white; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none;';
+                btn.onmouseover = () => btn.style.background = '#7c3aed';
+                btn.onmouseout = () => btn.style.background = '#8b5cf6';
+                btn.onclick = (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Send via console message to avoid OS intercepting magnet URL
+                  console.log('MKV_PLAY:' + link.href);
+                };
+                
+                link.parentElement.insertBefore(btn, link.nextSibling);
+              }
+              
+              // Find all magnet links
+              document.querySelectorAll('a[href^="magnet:"]').forEach(addPlayButton);
+              
+              // Watch for new links
+              const observer = new MutationObserver((mutations) => {
+                document.querySelectorAll('a[href^="magnet:"]').forEach(addPlayButton);
+              });
+              
+              observer.observe(document.body, { childList: true, subtree: true });
+            })();
+          `;
+          
+          webview.executeJavaScript(injectionScript).catch(err => {
+            console.error('Failed to inject buttons:', err);
+          });
+        }
+
+        if (loadSiteBtn) {
+          loadSiteBtn.addEventListener('click', async () => {
+            const url = siteUrlInput.value.trim();
+            if (url) {
+              await loadUrl(url.startsWith('http') ? url : 'https://' + url);
+            }
+          });
+
+          siteUrlInput.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+              loadSiteBtn.click();
+            }
+          });
+        }
+
+        // Navigation buttons
+        if (backBtn) {
+          backBtn.addEventListener('click', () => {
+            if (webview) webview.goBack();
+          });
+        }
+        
+        if (forwardBtn) {
+          forwardBtn.addEventListener('click', () => {
+            if (webview) webview.goForward();
+          });
+        }
+        
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', () => {
+            if (webview) webview.reload();
+          });
+        }
+
+        if (closeBrowserBtn) {
+          closeBrowserBtn.addEventListener('click', () => {
+            if (webview) {
+              webview.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;';
+              webview.src = 'about:blank';
+            }
+            document.getElementById('placeholder-text').style.display = 'block';
+            document.getElementById('browser-active-msg').style.display = 'none';
+            browserActive = false;
+          });
+        }
+
+        // Quick link buttons
+        document.querySelectorAll('.quick-link-btn-small').forEach(btn => {
+          btn.addEventListener('click', async function() {
+            const url = this.getAttribute('data-url');
+            siteUrlInput.value = url;
+            await loadUrl(url);
+          });
+        });
+       
 
         // Magnet form submission
         document.getElementById("magnet-form").addEventListener("submit", function (e) {
@@ -152,8 +495,19 @@
         // Update tab content
         document.querySelectorAll('.tab-content').forEach(content => {
           content.classList.remove('active');
+          // Hide browser tab properly
+          if (content.id === 'browser-tab') {
+            content.style.display = 'none';
+          }
         });
-        document.getElementById(`${tabName}-tab`).classList.add('active');
+        
+        const activeTab = document.getElementById(`${tabName}-tab`);
+        activeTab.classList.add('active');
+        
+        // Show browser tab with flex layout
+        if (tabName === 'browser') {
+          activeTab.style.display = 'flex';
+        }
 
         // Clear errors
         hideError();
