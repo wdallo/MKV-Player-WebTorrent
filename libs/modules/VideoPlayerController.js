@@ -907,18 +907,16 @@ export class VideoPlayerController {
 
       // Initialize subtitles if available
       if (subtitleContent) {
+        // Only auto-load if user hasn't made a selection yet
         if (this.subtitlesManager.userSelectedTrack === null) {
           await this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
           this.subtitlesLoaded = true;
-          if (
-            this.subtitlesManager.currentTrack === undefined ||
-            this.subtitlesManager.currentTrack === null
-          ) {
-            this.subtitlesManager.currentTrack = 0;
-          }
+          // Note: currentTrack is already set to 0 by SubtitlesManager constructor
+          // userSelectedTrack stays null to indicate auto-loaded default
         }
       } else {
         this.subtitlesLoaded = false;
+        // If no subtitle content, disable subtitles
         this.subtitlesManager.currentTrack = null;
       }
 
@@ -1093,12 +1091,7 @@ export class VideoPlayerController {
             if (subtitleContent) {
               this.subtitlesManager.initialize(subtitleContent, subtitlesUrl);
               this.subtitlesLoaded = true;
-              if (
-                this.subtitlesManager.currentTrack === undefined ||
-                this.subtitlesManager.currentTrack === null
-              ) {
-                this.subtitlesManager.currentTrack = 0;
-              }
+              // currentTrack already set by constructor, don't override
             } else {
               this.subtitlesManager.currentTrack = null;
             }
