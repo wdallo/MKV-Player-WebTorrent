@@ -45,7 +45,8 @@
     "forge": {
       "packagerConfig": {
         "name": "MKV-Video-Player",
-        "asar": false
+        "asar": false,
+        "icon": "favicon.ico"
       },
       "makers": [
         {
