@@ -2,23 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>MKV Video Player</title>
+    <title>
+      <%= pageTitle || "MKV Player" %> - v<%= appVersion || "dev" %>
+    </title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="preload" as="style" href="/libs/styles/plyr.css" />
     <link rel="stylesheet" href="/libs/styles/plyr.css" />
     <link rel="stylesheet" href="/libs/styles/style.css" />
-
-    <style>
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
 
     <script src="/libs/octopus/subtitles-octopus.js"></script>
   </head>
@@ -169,6 +160,15 @@
 
       // Initialize the application with error handling
       document.addEventListener("DOMContentLoaded", async () => {
+        // Apply Electron fullscreen layout if in Electron
+        if (window.electronAPI) {
+          document.body.classList.add("electron-app"); // Add Electron-specific stylesheet
+          const electronStyle = document.createElement("link");
+          electronStyle.rel = "stylesheet";
+          electronStyle.href = "/libs/styles/electron.css";
+          document.head.appendChild(electronStyle);
+        }
+
         try {
           const magnetUrl = decodeURIComponent(
             "<%- encodeURIComponent(magnet) %>",

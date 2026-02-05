@@ -7,10 +7,16 @@ export function renderPlayer(req, res) {
   if (!magnet || !magnet.startsWith("magnet:")) {
     return res.status(400).send("Missing or invalid magnet url param");
   }
-  // Render the player EJS view, passing the magnet link
-  res.render("player", { magnet });
+  // Render the player EJS view, passing the magnet link, title, and version
+  res.render("player", {
+    magnet,
+    pageTitle: "MKV Player - Player",
+    appVersion: process.env.npm_package_version || "dev",
+  });
 }
-
 export function renderIndex(req, res) {
-  res.render("index");
+  res.render("index", {
+    pageTitle: "MKV Player - Enter Magnet",
+    appVersion: process.env.npm_package_version || "dev",
+  });
 }

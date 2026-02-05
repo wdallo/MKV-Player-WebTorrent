@@ -2,52 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>MKV Player - Enter Magnet</title>
+<title><%= pageTitle || "MKV Player" %> - v<%= appVersion || "dev" %></title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/libs/styles/style.css" />
-    <style>
-      .quick-link-btn-small {
-        background: rgba(102, 126, 234, 0.2);
-        color: white;
-        border: 1px solid rgba(102, 126, 234, 0.3);
-        padding: 6px 12px;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        white-space: nowrap;
-      }
-      .quick-link-btn-small:hover {
-        background: rgba(102, 126, 234, 0.4);
-        border-color: rgba(102, 126, 234, 0.6);
-      }
-      .nav-btn {
-        background: rgba(255, 255, 255, 0.1);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 8px 14px;
-        border-radius: 6px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-      .nav-btn:hover {
-        background: rgba(255, 255, 255, 0.2);
-      }
-      .nav-btn:disabled {
-        opacity: 0.3;
-        cursor: not-allowed;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    </style>
+   
+
+
   </head>
   <body>
     <main class="container">
-      <h1>Load Torrent</h1>
+      <!-- <h1>Load Torrent</h1> -->
       <div class="tabs">
         <button type="button" class="tab-btn active" data-tab="magnet">Magnet URL</button>
         <button type="button" class="tab-btn" data-tab="torrent">Torrent File</button>
@@ -176,6 +140,13 @@
         // Show Browse Sites tab only in Electron
         if (window.electronAPI) {
           document.getElementById('browse-tab-btn').style.display = 'inline-block';
+          // Apply Electron fullscreen layout
+          document.body.classList.add('electron-app');
+          // Add Electron-specific stylesheet
+          const electronStyle = document.createElement('link');
+          electronStyle.rel = 'stylesheet';
+          electronStyle.href = '/libs/styles/electron.css';
+          document.head.appendChild(electronStyle);
         }
         
         torrentParser = new TorrentParser();
