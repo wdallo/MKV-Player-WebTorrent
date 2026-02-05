@@ -16,7 +16,18 @@
   <body>
     <main class="container">
       <header style="position: relative">
-        <h1>MKV Video Player</h1>
+     <h1>
+ 
+  <% 
+    const nameMatch = magnet && magnet.match(/[&?]dn=([^&]+)/);
+    const hashMatch = magnet && magnet.match(/btih:([A-Fa-f0-9]+)/);
+    if (nameMatch) { 
+  %>
+    <span style="font-size:0.7em; color:#aaa;"><%= decodeURIComponent(nameMatch[1]) %></span>
+  <% } else if (hashMatch) { %>
+    <span style="font-size:0.7em; color:#aaa;">[<%= hashMatch[1] %>]</span>
+  <% } %>
+</h1>
         <a href="/" class="back-btn back-btn-topright">← Back to Home</a>
       </header>
 
