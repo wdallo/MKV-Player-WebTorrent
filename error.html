@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Server Error - MKV Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="libs/styles/style.css" />
+    <style>
+      body {
+        background: #181818;
+        color: #fff;
+        font-family: "Segoe UI", "Arial", sans-serif;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-icon {
+        font-size: 3.5em;
+        margin-bottom: 10px;
+        color: #ff5555;
+        filter: drop-shadow(0 2px 8px #ff555555);
+        text-align: center;
+      }
+      .error-title {
+        color: #ff5555;
+        margin-bottom: 18px;
+        font-size: 2.2em;
+        letter-spacing: 1px;
+        text-align: center;
+      }
+      .error-desc {
+        color: #e0e0e0;
+        font-size: 1.15em;
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      .details {
+        color: #ffb366;
+        margin-top: 22px;
+        font-size: 1.08em;
+        word-break: break-all;
+        text-align: center;
+      }
+      .magnet-form-btn {
+        margin-top: 32px;
+        padding: 12px 38px;
+        background: linear-gradient(90deg, #ff5555 0%, #ffb366 100%);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1em;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 2px 12px #0005;
+        transition:
+          background 0.2s,
+          transform 0.1s;
+        display: inline-block;
+      }
+      .magnet-form-btn:hover {
+        background: linear-gradient(90deg, #ffb366 0%, #ff5555 100%);
+        transform: translateY(-2px) scale(1.04);
+      }
+      .magnet-form-btn:active {
+        transform: scale(0.98);
+      }
+      .container {
+        max-width: 420px;
+        margin: 40px auto;
+        background: #222;
+        border-radius: 12px;
+        box-shadow: 0 4px 24px #000a;
+        padding: 32px 24px 24px 24px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <div class="error-icon">&#9888;</div>
+      <h1 class="error-title">Server Error</h1>
+      <p class="error-desc">Server could not be started.</p>
+      <div class="details" id="errordetails"></div>
+      <div style="color: #aaa; margin-top: 18px; font-size: 0.98em">
+        If the problem persists, try turning the app off and on again.
+      </div>
+    </main>
+    <script>
+      // Show error from query string if present
+      const params = new URLSearchParams(window.location.search);
+      // Jei error žinutėje yra ERR_CONNECTION_REFUSED (-102), rodyti tik šį tekstą
+      // Kitaip, rodyti visą error
+      if (params.has("error")) {
+        let err = params.get("error");
+        const match = err.match(/ERR_CONNECTION_REFUSED \(-102\)/);
+        if (match) {
+          document.getElementById("errordetails").textContent = match[0];
+        } else {
+          document.getElementById("errordetails").textContent = err;
+        }
+      }
+    </script>
+  </body>
+</html>

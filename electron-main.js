@@ -66,11 +66,14 @@ async function createWindow() {
     }
   });
 
-  // Start the Express server
-  await startServer();
-
-  // Load the app
-  await mainWindow.loadURL(`http://localhost:${PORT}`);
+  try {
+    await startServer();
+    await mainWindow.loadURL(`http://localhost:${PORT}`);
+  } catch (err) {
+    const errorPath = path.join(__dirname, "error.html");
+    const errorUrl = `file://${errorPath}?error=${encodeURIComponent(err && err.message ? err.message : String(err))}`;
+    await mainWindow.loadURL(errorUrl);
+  }
 
   // Handle window closed
   mainWindow.on("closed", () => {
