@@ -2,8 +2,8 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
 [![Electron](https://img.shields.io/badge/Electron-39%2B-blue.svg)](https://electronjs.org/)
-[![Express](https://img.shields.io/badge/Express-5.x-lightgrey.svg)](https://expressjs.com/)
-[![WebTorrent](https://img.shields.io/badge/WebTorrent-2.6-blue.svg)](https://webtorrent.io/)
+[![Express](https://img.shields.io/badge/Express-5.2.x-lightgrey.svg)](https://expressjs.com/)
+[![WebTorrent](https://img.shields.io/badge/WebTorrent-2.8.5-blue.svg)](https://webtorrent.io/)
 [![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
 > A sophisticated, cross-platform video player for streaming MKV/MP4 files directly from BitTorrent magnets with instant playback, intelligent resource management, multi-track audio/subtitle support, and professional ASS/SSA subtitle rendering. Features a modular ES6 architecture with unified loading overlay system. Available as both a web application and native desktop app.
@@ -266,17 +266,17 @@ MKV-Player-WebTorrent/
 
 ### Technology Stack
 
-| Component            | Technology                  | Purpose                                   |
-| -------------------- | --------------------------- | ----------------------------------------- |
-| **Backend**          | Node.js + Express 5.x       | HTTP server & API endpoints               |
-| **Desktop App**      | Electron 39+                | Native cross-platform desktop wrapper     |
-| **Security**         | Helmet + express-rate-limit | Security headers & smart rate limiting    |
-| **Streaming**        | WebTorrent 2.6              | P2P video streaming                       |
-| **Video Processing** | FFmpeg + fluent-ffmpeg      | Subtitle extraction & audio transcoding   |
-| **Frontend**         | Vanilla JS + ES6 Modules    | Modular architecture with dynamic imports |
-| **Video Player**     | Plyr                        | Modern HTML5 video player                 |
-| **Subtitles**        | SubtitlesOctopus + libass   | Advanced ASS/SSA subtitle rendering       |
-| **Compression**      | gzip                        | Response compression                      |
+| Component            | Technology                    | Purpose                                   |
+| -------------------- | ----------------------------- | ----------------------------------------- |
+| **Backend**          | Node.js + Express 5.2.x       | HTTP server & API endpoints               |
+| **Desktop App**      | Electron 39+                  | Native cross-platform desktop wrapper     |
+| **Security**         | Helmet + express-rate-limit   | Security headers & smart rate limiting    |
+| **Streaming**        | WebTorrent 2.8.5              | P2P video streaming                       |
+| **Video Processing** | FFmpeg-static + fluent-ffmpeg | Subtitle extraction & audio transcoding   |
+| **Frontend**         | Vanilla JS + ES6 Modules      | Modular architecture with dynamic imports |
+| **Video Player**     | Plyr                          | Modern HTML5 video player                 |
+| **Subtitles**        | SubtitlesOctopus + libass     | Advanced ASS/SSA subtitle rendering       |
+| **Compression**      | gzip                          | Response compression                      |
 
 ### 🔄 Loading Sequence Flow
 
@@ -355,15 +355,16 @@ overlay.hide();
    ```
 
    **Key Dependencies Installed:**
-   - `electron` (39.2.7) - Desktop application framework
-   - `@electron-forge/cli` - Build and packaging tools
-   - `express` (5.1.0) - Web framework
-   - `express-rate-limit` (8.2.1) - Smart rate limiting
-   - `helmet` (8.1.0) - Security headers and CSP
-   - `webtorrent` (2.6.8) - P2P streaming technology
-   - `ffmpeg-static` (5.2.0) - Video processing
-   - `fluent-ffmpeg` (2.1.3) - FFmpeg wrapper
-   - `libass-wasm` (4.1.0) - Advanced subtitle rendering
+
+- `electron` (39.x) - Desktop application framework
+- `@electron-forge/cli` - Build and packaging tools
+- `express` (5.2.x) - Web framework
+- `express-rate-limit` (8.2.1) - Smart rate limiting
+- `helmet` (8.1.0) - Security headers and CSP
+- `webtorrent` (2.8.5) - P2P streaming technology
+- `ffmpeg-static` (5.3.0) - Video processing
+- `fluent-ffmpeg` (2.1.3) - FFmpeg wrapper
+- `libass-wasm` (4.1.0) - Advanced subtitle rendering
 
 ## 🖥️ Desktop Application
 
