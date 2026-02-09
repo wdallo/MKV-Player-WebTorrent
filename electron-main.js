@@ -111,7 +111,7 @@ function startServer() {
       // Start the Express server as a child process
       serverProcess = spawn("node", ["app.js"], {
         cwd: __dirname,
-        env: { ...process.env, PORT: PORT },
+        env: { ...process.env, PORT: PORT, ELECTRON: "1" },
         stdio: isDev ? "inherit" : "ignore",
       });
 
@@ -154,6 +154,16 @@ function createMenu() {
           accelerator: "CmdOrCtrl+Shift+R",
           click: () => {
             mainWindow.webContents.reloadIgnoringCache();
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Settings",
+          accelerator: "CmdOrCtrl+,",
+          click: () => {
+            if (mainWindow) {
+              mainWindow.loadURL(`http://localhost:${PORT}/desktop/settings`);
+            }
           },
         },
         { type: "separator" },
@@ -558,3 +568,9 @@ if (process.defaultApp) {
 } else {
   app.setAsDefaultProtocolClient("mkv-player");
 }
+
+// Handle restart-app signal
+ipcMain.on("restart-app", () => {
+  app.relaunch();
+  app.exit();
+});
