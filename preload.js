@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   setBrowserViewOffset: (offset, height) =>
     ipcRenderer.invoke("set-browser-view-offset", offset, height),
+  restartApp: () => ipcRenderer.send("restart-app"),
 });

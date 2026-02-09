@@ -454,46 +454,46 @@ export class SubtitlesManager {
     )}&track=${trackIndex}`;
 
     try {
-        // Wait a bit before first request to ensure subtitles are ready
-        await new Promise((res) => setTimeout(res, 1000));
+      // Wait a bit before first request to ensure subtitles are ready
+      await new Promise((res) => setTimeout(res, 1000));
 
-        // Repeatedly request subtitles until loaded
-        let loaded = false;
-        let attempts = 0;
-        while (!loaded && attempts < 20) {
-          attempts++;
-          try {
-            // Add timestamp to bypass cache
-            const urlWithTimestamp = subtitlesUrl + "&_t=" + Date.now();
-            const response = await fetch(urlWithTimestamp, {
-              cache: "no-store",
-              headers: {
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                Pragma: "no-cache",
-                Expires: "0",
-              },
-            });
-            if (response.ok) {
-              const subtitleContent = await response.text();
-              if (
-                subtitleContent &&
-                subtitleContent.length > 10 &&
-                subtitleContent.indexOf("[Script Info]") !== -1
-              ) {
-                this.dispose();
-                const canvas = document.querySelector(".libassjs-canvas");
-                if (canvas) canvas.remove();
-                await this.initialize(subtitleContent, subtitlesUrl);
-                this.updateSelectorDisplay();
-                loaded = true;
-                break;
-              }
+      // Repeatedly request subtitles until loaded
+      let loaded = false;
+      let attempts = 0;
+      while (!loaded && attempts < 20) {
+        attempts++;
+        try {
+          // Add timestamp to bypass cache
+          const urlWithTimestamp = subtitlesUrl + "&_t=" + Date.now();
+          const response = await fetch(urlWithTimestamp, {
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+          });
+          if (response.ok) {
+            const subtitleContent = await response.text();
+            if (
+              subtitleContent &&
+              subtitleContent.length > 10 &&
+              subtitleContent.indexOf("[Script Info]") !== -1
+            ) {
+              this.dispose();
+              const canvas = document.querySelector(".libassjs-canvas");
+              if (canvas) canvas.remove();
+              await this.initialize(subtitleContent, subtitlesUrl);
+              this.updateSelectorDisplay();
+              loaded = true;
+              break;
             }
-          } catch (err) {
-            // Ignore and retry
           }
-          await new Promise((res) => setTimeout(res, 500));
+        } catch (err) {
+          // Ignore and retry
         }
+        await new Promise((res) => setTimeout(res, 500));
+      }
       // Hide overlay after loading
       overlay.hide();
       if (video && video.paused) video.play();
@@ -576,10 +576,10 @@ export class SubtitlesManager {
     this.pollInterval = setInterval(async () => {
       // Don't poll if user explicitly disabled subtitles (selected "none")
       if (this.currentTrack === null) return;
-      
+
       // Build URL for current track (in case it changed)
       const currentSubtitlesUrl = `/subtitles?url=${encodeURIComponent(this.magnetUrl)}&track=${this.currentTrack}`;
-      
+
       try {
         // Add timestamp to URL to bypass cache
         const urlWithTimestamp = currentSubtitlesUrl + "&_t=" + Date.now();

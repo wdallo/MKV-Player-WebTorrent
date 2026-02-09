@@ -132,11 +132,7 @@ function createApp() {
   app.use(subtitleRoutes);
   app.use(embedRoutes);
 
-  // 404 handler
-  app.use(notFoundHandler);
-
-  // Error handling middleware (must be last)
-  app.use(errorHandler);
+  // 404 and error handlers are now registered in startServer after all routes
 
   return app;
 }
@@ -154,6 +150,16 @@ async function startServer() {
 
     // Create Express app
     const app = createApp();
+    // Conditionally load Electron-only routes
+    if (process.env.ELECTRON) {
+      const { default: desktopRoutes } =
+        await import("./routes/desktopRoutes.js");
+      app.use("/desktop", desktopRoutes);
+    }
+
+    // Register 404 and error handlers after all routes
+    app.use(notFoundHandler);
+    app.use(errorHandler);
 
     // Start listening
     const server = app.listen(SERVER_CONFIG.PORT, SERVER_CONFIG.HOST, () => {

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>
+      <%= pageTitle || "MKV Player Settings" %> - v<%= appVersion || "dev" %>
+    </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/libs/styles/style.css" />
+    <link rel="stylesheet" href="/libs/styles/electron.css" />
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        document.body.classList.add("electron-app");
+      });
+    </script>
+  </head>
+  <body>
+    <main
+      class="container"
+      style="
+        width: 100vw;
+        height: 100vh;
+        min-height: 100vh;
+        min-width: 100vw;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        "
+      >
+        <h1
+          style="
+            text-align: center;
+            margin: 32px 0 24px 20px;
+            font-size: 2.2rem;
+            color: #00b3ff;
+            letter-spacing: 1px;
+          "
+        >
+          APP Settings
+        </h1>
+      </div>
+      <div class="settings-header">
+        <button
+          id="reset-defaults-btn"
+          class="magnet-form-btn"
+          style="position: absolute; right: 25px; top: 75px"
+        >
+          Set to Default Settings
+        </button>
+        <a href="/" class="back-btn back-btn-topright">← Back to Home</a>
+      </div>
+      <div
+        style="
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          justify-content: flex-start;
+          width: calc(100% - 50px);
+          height: 50%;
+          margin-left: 25px;
+          margin-right: 25px;
+        "
+      >
+        <div
+          id="settings-tabs"
+          style="
+            display: flex;
+            border-bottom: 2px solid #222;
+            margin-bottom: 24px;
+            width: 100%;
+          "
+        >
+          <button
+            class="tab-btn active"
+            data-tab="summary"
+            style="
+              flex: 1;
+              padding: 18px 0;
+              background: none;
+              border: none;
+              color: #00b3ff;
+              font-size: 1.2rem;
+              font-weight: 600;
+              cursor: pointer;
+              outline: none;
+              border-bottom: 2px solid #00b3ff;
+              transition: background 0.2s;
+            "
+          >
+            Summary
+          </button>
+          <button
+            class="tab-btn"
+            data-tab="player"
+            style="
+              flex: 1;
+              padding: 18px 0;
+              background: none;
+              border: none;
+              color: #fff;
+              font-size: 1.2rem;
+              font-weight: 600;
+              cursor: pointer;
+              outline: none;
+              border-bottom: 2px solid transparent;
+            "
+          >
+            Player Settings
+          </button>
+          <button
+            class="tab-btn"
+            data-tab="perf"
+            style="
+              flex: 1;
+              padding: 18px 0;
+              background: none;
+              border: none;
+              color: #fff;
+              font-size: 1.2rem;
+              font-weight: 600;
+              cursor: pointer;
+              outline: none;
+              border-bottom: 2px solid transparent;
+            "
+          >
+            Performance Settings
+          </button>
+        </div>
+        <section
+          id="tab-summary"
+          class="tab-section"
+          style="display: block; width: 100%; height: 100%; overflow: auto"
+        >
+          <table
+            id="settings-summary"
+            style="width: 100%; border-collapse: collapse; margin-bottom: 24px"
+          >
+            <thead>
+              <tr>
+                <th style="text-align: left; padding: 10px 12px">Key</th>
+                <th style="text-align: left; padding: 10px 12px">Value</th>
+                <th style="text-align: left; padding: 10px 12px">Section</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+        <section
+          id="tab-player"
+          class="tab-section"
+          style="display: none; width: 100%; height: 100%; overflow: auto"
+        >
+          <form id="settings-form-player" style="width: 100%">
+            <div id="settings-fields-player"></div>
+            <button
+              type="submit"
+              class="magnet-form-btn"
+              style="margin-top: 20px; margin-bottom: 20px; width: 98%"
+            >
+              Save Player Settings
+            </button>
+          </form>
+        </section>
+        <section
+          id="tab-perf"
+          class="tab-section"
+          style="display: none; width: 100%; height: 100%; overflow: auto"
+        >
+          <form id="settings-form-perf" style="width: 100%">
+            <div id="settings-fields-perf"></div>
+            <button
+              type="submit"
+              class="magnet-form-btn"
+              style="margin-top: 20px; margin-bottom: 20px; width: 98%"
+            >
+              Save Performance Settings
+            </button>
+          </form>
+        </section>
+        <div
+          id="settings-success"
+          style="
+            display: none;
+            color: #10b981;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: 600;
+          "
+        ></div>
+        <div
+          id="settings-error"
+          style="
+            display: none;
+            color: #ef4444;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: 600;
+          "
+        ></div>
+      </div>
+    </main>
+    <script>
+      const visiblePlayerFields = [
+        "MAX_RETRIES",
+        "BASE_RETRY_DELAY",
+        "MAX_RETRY_DELAY",
+        "CONTINUOUS_RETRY_INTERVAL",
+        "STATUS_POLL_INTERVAL",
+        "READY_THRESHOLD",
+        "RESOURCE_TIMEOUT",
+        "STALL_TIMEOUT",
+        "MANUAL_CLEANUP",
+        "DEBOUNCE_DELAY",
+        "ENABLE_CSP",
+        "RATE_LIMIT",
+      ];
+
+      const visiblePerfFields = [
+        "MAX_CONCURRENT_TORRENTS",
+        "PIECE_SELECTION_BATCH_SIZE",
+        "INITIAL_DOWNLOAD_SIZE",
+        "STREAMING_DOWNLOAD_SIZE",
+        "RESOURCE_LOG_INTERVAL",
+        "CLEANUP_INTERVAL",
+        "FILE_WATCH_DEBOUNCE",
+        "MAX_FILE_SIZE",
+        "MAX_MAGNET_LENGTH",
+        "CONNECTION_TIMEOUT",
+      ];
+      async function loadSettings() {
+        const res = await fetch("/desktop/settings-data");
+        const config = await res.json();
+        if (!config) return;
+        const playerDiv = document.getElementById("settings-fields-player");
+        const perfDiv = document.getElementById("settings-fields-perf");
+        // Make both forms use a flex grid
+        playerDiv.style.display = "flex";
+        playerDiv.style.flexWrap = "wrap";
+        playerDiv.style.gap = "18px";
+        perfDiv.style.display = "flex";
+        perfDiv.style.flexWrap = "wrap";
+        perfDiv.style.gap = "18px";
+        const summaryBody = document.querySelector("#settings-summary tbody");
+        playerDiv.innerHTML = "";
+        perfDiv.innerHTML = "";
+        summaryBody.innerHTML = "";
+        Object.entries(config.PLAYER_CONFIG).forEach(([key, value]) => {
+          if (!visiblePlayerFields.includes(key)) return;
+          // Add to summary table
+          const row = document.createElement("tr");
+          row.innerHTML = `<td style='padding:6px 8px;border-bottom:1px solid #222;'>${key}</td><td style='padding:6px 8px;border-bottom:1px solid #222;'>${value}</td><td style='padding:6px 8px;border-bottom:1px solid #222;'>PLAYER_CONFIG</td>`;
+          summaryBody.appendChild(row);
+          // Add to form
+          const field = document.createElement("div");
+          field.style.marginBottom = "12px";
+          field.style.flex = "1 1 45%";
+          field.style.minWidth = "220px";
+          if (
+            typeof value === "boolean" ||
+            value === true ||
+            value === false ||
+            value === "true" ||
+            value === "false"
+          ) {
+            field.innerHTML = `<label style='font-weight:600;'>${key}</label><select name='PLAYER_CONFIG__${key}' style='width:100%;padding:6px;margin-top:4px;border-radius:4px;border:1px solid #333;background:#222;color:#fff;'><option value='true' ${value === true || value === "true" ? "selected" : ""}>True</option><option value='false' ${value === false || value === "false" ? "selected" : ""}>False</option></select>`;
+          } else {
+            field.innerHTML = `<label style='font-weight:600;'>${key}</label><input type='text' name='PLAYER_CONFIG__${key}' value='${value}' style='width:100%;padding:6px;margin-top:4px;border-radius:4px;border:1px solid #333;background:#222;color:#fff;'>`;
+          }
+          playerDiv.appendChild(field);
+        });
+        Object.entries(config.PERF_CONFIG).forEach(([key, value]) => {
+          if (!visiblePerfFields.includes(key)) return;
+          // Add to summary table
+          const row = document.createElement("tr");
+          row.innerHTML = `<td style='padding:6px 8px;border-bottom:1px solid #222;'>${key}</td><td style='padding:6px 8px;border-bottom:1px solid #222;'>${value}</td><td style='padding:6px 8px;border-bottom:1px solid #222;'>PERF_CONFIG</td>`;
+          summaryBody.appendChild(row);
+          // Add to form
+          const field = document.createElement("div");
+          field.style.marginBottom = "12px";
+          field.style.flex = "1 1 45%";
+          field.style.minWidth = "220px";
+          if (
+            typeof value === "boolean" ||
+            value === true ||
+            value === false ||
+            value === "true" ||
+            value === "false"
+          ) {
+            field.innerHTML = `<label style='font-weight:600;'>${key}</label><select name='PERF_CONFIG__${key}' style='width:100%;padding:6px;margin-top:4px;border-radius:4px;border:1px solid #333;background:#222;color:#fff;'><option value='true' ${value === true || value === "true" ? "selected" : ""}>True</option><option value='false' ${value === false || value === "false" ? "selected" : ""}>False</option></select>`;
+          } else {
+            field.innerHTML = `<label style='font-weight:600;'>${key}</label><input type='text' name='PERF_CONFIG__${key}' value='${value}' style='width:100%;padding:6px;margin-top:4px;border-radius:4px;border:1px solid #333;background:#222;color:#fff;'>`;
+          }
+          perfDiv.appendChild(field);
+        });
+      }
+      document.addEventListener("DOMContentLoaded", function () {
+        loadSettings();
+        // Tab switching logic
+        const tabBtns = document.querySelectorAll(".tab-btn");
+        const tabSections = document.querySelectorAll(".tab-section");
+        tabBtns.forEach((btn) => {
+          btn.addEventListener("click", function () {
+            tabBtns.forEach((b) => {
+              b.classList.remove("active");
+              b.style.color = "#fff";
+              b.style.borderBottom = "2px solid transparent";
+            });
+            tabSections.forEach((s) => (s.style.display = "none"));
+            btn.classList.add("active");
+            btn.style.color = "#00b3ff";
+            btn.style.borderBottom = "2px solid #00b3ff";
+            document.getElementById("tab-" + btn.dataset.tab).style.display =
+              "block";
+          });
+        });
+        // Reset to default logic
+        document
+          .getElementById("reset-defaults-btn")
+          .addEventListener("click", async function () {
+            if (
+              !confirm(
+                "Are you sure you want to reset all settings to default? This will overwrite all changes.",
+              )
+            )
+              return;
+            const res = await fetch("/desktop/settings-data", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ RESET_DEFAULTS: true }),
+            });
+            if (res.ok) {
+              document.getElementById("settings-success").textContent =
+                "Settings restored to default!";
+              document.getElementById("settings-success").style.display =
+                "block";
+              document.getElementById("settings-error").style.display = "none";
+              loadSettings();
+            } else {
+              document.getElementById("settings-error").textContent =
+                "Failed to restore defaults.";
+              document.getElementById("settings-error").style.display = "block";
+              document.getElementById("settings-success").style.display =
+                "none";
+            }
+          });
+      });
+      // Player settings form submit
+      document
+        .getElementById("settings-form-player")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const formData = new FormData(this);
+          const newPlayer = {};
+          for (const [key, value] of formData.entries()) {
+            if (key.startsWith("PLAYER_CONFIG__")) {
+              let v = value;
+              if (v === "true") v = true;
+              else if (v === "false") v = false;
+              else if (!isNaN(v) && v !== "") v = Number(v);
+              newPlayer[key.replace("PLAYER_CONFIG__", "")] = v;
+            }
+          }
+          try {
+            const res = await fetch("/desktop/settings-data", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ PLAYER_CONFIG: newPlayer }),
+            });
+            if (res.ok) {
+              const overlay = document.createElement("div");
+              overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                `;
+              overlay.innerHTML = `
+                <div style="
+                  background: #1a1a1a;
+                  padding: 40px;
+                  border-radius: 8px;
+                  text-align: center;
+                  border: 2px solid #00b3ff;
+                ">
+                  <p style="color: #00b3ff; font-size: 1.2rem; font-weight: 600; margin: 0;">
+                  Player settings saved! Restarting...
+                  </p>
+                </div>
+                `;
+              document.body.appendChild(overlay);
+              document.getElementById("settings-success").style.display =
+                "block";
+              document.getElementById("settings-error").style.display = "none";
+              setTimeout(() => {
+                if (window.electronAPI && window.electronAPI.restartApp) {
+                  window.electronAPI.restartApp();
+                }
+              }, 800);
+              // loadSettings(); // nebereikia, nes restartins
+            } else {
+              document.getElementById("settings-error").textContent =
+                "Failed to save player settings.";
+              document.getElementById("settings-error").style.display = "block";
+              document.getElementById("settings-success").style.display =
+                "none";
+            }
+          } catch (err) {
+            document.getElementById("settings-error").textContent =
+              "Failed to save player settings.";
+            document.getElementById("settings-error").style.display = "block";
+            document.getElementById("settings-success").style.display = "none";
+          }
+        });
+
+      // Performance settings form submit
+      document
+        .getElementById("settings-form-perf")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const formData = new FormData(this);
+          const newPerf = {};
+          for (const [key, value] of formData.entries()) {
+            if (key.startsWith("PERF_CONFIG__")) {
+              let v = value;
+              if (v === "true") v = true;
+              else if (v === "false") v = false;
+              else if (!isNaN(v) && v !== "") v = Number(v);
+              newPerf[key.replace("PERF_CONFIG__", "")] = v;
+            }
+          }
+          try {
+            const res = await fetch("/desktop/settings-data", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ PERF_CONFIG: newPerf }),
+            });
+            if (res.ok) {
+              document.getElementById("settings-success").textContent =
+                "Performance settings saved! Restarting...";
+              document.getElementById("settings-success").style.display =
+                "block";
+              document.getElementById("settings-error").style.display = "none";
+              setTimeout(() => {
+                if (window.electronAPI && window.electronAPI.restartApp) {
+                  window.electronAPI.restartApp();
+                }
+              }, 800);
+              // loadSettings();
+            } else {
+              document.getElementById("settings-error").textContent =
+                "Failed to save performance settings.";
+              document.getElementById("settings-error").style.display = "block";
+              document.getElementById("settings-success").style.display =
+                "none";
+            }
+          } catch (err) {
+            document.getElementById("settings-error").textContent =
+              "Failed to save performance settings.";
+            document.getElementById("settings-error").style.display = "block";
+            document.getElementById("settings-success").style.display = "none";
+          }
+        });
+    </script>
+  </body>
+</html>
