@@ -21,23 +21,38 @@ export const PERF_CONFIG = {
 };
 
 export const PLAYER_CONFIG = {
-  MAX_RETRIES: 20,
-  BASE_RETRY_DELAY: 1000,
-  MAX_RETRY_DELAY: 6000,
-  CONTINUOUS_RETRY_INTERVAL: 20000,
-  STATUS_POLL_INTERVAL: 600,
-  READY_THRESHOLD: 524288,
-  RESOURCE_TIMEOUT: 200,
-  STALL_TIMEOUT: 12000,
-  WATERMARK: true,
-  WATERMARK_CONTENT: "Demo Watermark",
-  MANUAL_CLEANUP: true,
-  AUTO_DELETE_HOURS: 24,
-  DEBUG_MODE: true,
-  DOM_CACHE_TIMEOUT: 30000,
-  DEBOUNCE_DELAY: 100,
-  ENABLE_CSP: true,
-  RATE_LIMIT: 100,
+  // Retry configuration
+  MAX_RETRIES: 20, // Maximum number of retry attempts for failed operations
+  BASE_RETRY_DELAY: 1000, // Initial delay between retries (ms)
+  MAX_RETRY_DELAY: 6000, // Maximum delay cap for exponential backoff (ms)
+  CONTINUOUS_RETRY_INTERVAL: 20000, // Interval for continuous polling fallback (ms)
+
+  // Status and readiness
+  STATUS_POLL_INTERVAL: 600, // Poll interval for checking playback status (ms)
+  READY_THRESHOLD: 524288, // Minimum buffered bytes (512KB) required to start playback
+
+  // Timeout thresholds
+  RESOURCE_TIMEOUT: 200, // Maximum wait time for resource to load (ms)
+  STALL_TIMEOUT: 12000, // Time to detect and handle playback stalls (ms)
+
+  // Visual settings
+  WATERMARK: false, // Toggle watermark display
+  WATERMARK_CONTENT: "Demo Watermark", // Text displayed in watermark
+
+  // File management
+  MANUAL_CLEANUP: true, // Immediately clean up files when player closes
+  AUTO_DELETE_HOURS: 24, // Automatically delete cached files after N hours
+
+  // Development
+  DEBUG_MODE: true, // Enable detailed debug logging to console
+
+  // Optimization
+  DOM_CACHE_TIMEOUT: 30000, // Cache timeout for DOM element queries (ms)
+  DEBOUNCE_DELAY: 100, // Debounce interval for UI event handlers (ms)
+
+  // Safety
+  ENABLE_CSP: true, // Enable Content Security Policy headers
+  RATE_LIMIT: 100, // Maximum allowed requests per minute
 };
 
 // Plyr player configuration
