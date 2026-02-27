@@ -2,22 +2,33 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-<title><%= pageTitle || "MKV Player" %> - v<%= appVersion || "dev" %></title>
+    <title>
+      <%= pageTitle || "MKV Player" %> - v<%= appVersion || "dev" %>
+    </title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/libs/styles/style.css" />
-   
-
-
   </head>
   <body>
     <main class="container">
       <!-- <h1>Load Torrent</h1> -->
       <div class="tabs">
-        <button type="button" class="tab-btn active" data-tab="magnet">Magnet URL</button>
-        <button type="button" class="tab-btn" data-tab="torrent">Torrent File</button>
-        <button type="button" class="tab-btn" id="browse-tab-btn" data-tab="browser" style="display: none;">Browse Sites</button>
+        <button type="button" class="tab-btn active" data-tab="magnet">
+          Magnet URL
+        </button>
+        <button type="button" class="tab-btn" data-tab="torrent">
+          Torrent File
+        </button>
+        <button
+          type="button"
+          class="tab-btn"
+          id="browse-tab-btn"
+          data-tab="browser"
+          style="display: none"
+        >
+          Browse Sites
+        </button>
       </div>
-      
+
       <!-- Magnet URL Tab -->
       <div id="magnet-tab" class="tab-content active">
         <form id="magnet-form" class="magnet-form">
@@ -41,93 +52,253 @@
       <div id="torrent-tab" class="tab-content">
         <form id="torrent-form" class="magnet-form">
           <div class="file-upload-area" id="file-upload-area">
-            <input type="file" id="torrent-file" accept=".torrent" style="display: none;" />
+            <input
+              type="file"
+              id="torrent-file"
+              accept=".torrent"
+              style="display: none"
+            />
             <div class="file-upload-content">
               <p>Drop a .torrent file here or click to select</p>
-              <button type="button" id="choose-file-btn" class="magnet-form-btn">
+              <button
+                type="button"
+                id="choose-file-btn"
+                class="magnet-form-btn"
+              >
                 Choose Torrent File
               </button>
             </div>
           </div>
-          <div id="file-info" class="file-info" style="display: none;">
+          <div id="file-info" class="file-info" style="display: none">
             <p id="file-name"></p>
-            <button type="submit" class="magnet-form-btn">Parse & Load Torrent</button>
+            <button type="submit" class="magnet-form-btn">
+              Parse & Load Torrent
+            </button>
           </div>
         </form>
       </div>
 
       <!-- Browser Tab -->
-      <div id="browser-tab" class="tab-content" style="display: none; flex-direction: column; height: calc(100vh - 120px);">
-        <div class="browser-container" style="max-width: 100%; margin: 0; padding: 0; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+      <div
+        id="browser-tab"
+        class="tab-content"
+        style="
+          display: none;
+          flex-direction: column;
+          height: calc(100vh - 120px);
+        "
+      >
+        <div
+          class="browser-container"
+          style="
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+          "
+        >
           <!-- Toolbar -->
-          <div style="background: #1e1e1e; padding: 12px 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #333;">
-            <button type="button" id="back-btn" class="nav-btn" title="Back">◄</button>
-            <button type="button" id="forward-btn" class="nav-btn" title="Forward">►</button>
-            <button type="button" id="refresh-btn" class="nav-btn" title="Refresh">⟳</button>
-            <button type="button" id="close-browser-btn" class="nav-btn" title="Close Browser" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.3);">✕</button>
+          <div
+            style="
+              background: #1e1e1e;
+              padding: 12px 20px;
+              display: flex;
+              gap: 10px;
+              align-items: center;
+              border-bottom: 1px solid #333;
+            "
+          >
+            <button type="button" id="back-btn" class="nav-btn" title="Back">
+              ◄
+            </button>
+            <button
+              type="button"
+              id="forward-btn"
+              class="nav-btn"
+              title="Forward"
+            >
+              ►
+            </button>
+            <button
+              type="button"
+              id="refresh-btn"
+              class="nav-btn"
+              title="Refresh"
+            >
+              ⟳
+            </button>
+            <button
+              type="button"
+              id="close-browser-btn"
+              class="nav-btn"
+              title="Close Browser"
+              style="
+                background: rgba(239, 68, 68, 0.2);
+                border-color: rgba(239, 68, 68, 0.3);
+              "
+            >
+              ✕
+            </button>
             <input
               type="url"
               id="site-url"
               placeholder="Enter torrent site URL..."
               class="magnet-form-input"
               value="https://subsplease.org"
-              style="flex: 1; margin: 0;"
+              style="flex: 1; margin: 0"
             />
-            <button type="button" id="load-site-btn" class="magnet-form-btn" style="margin: 0;">Go</button>
+            <button
+              type="button"
+              id="load-site-btn"
+              class="magnet-form-btn"
+              style="margin: 0"
+            >
+              Go
+            </button>
           </div>
-          
+
           <!-- Quick Links Bar -->
-          <div style="background: #252525; padding: 10px 20px; display: flex; gap: 8px; border-bottom: 1px solid #333; overflow-x: auto;">
-            <button type="button" class="quick-link-btn-small" data-url="https://subsplease.org">
+          <div
+            style="
+              background: #252525;
+              padding: 10px 20px;
+              display: flex;
+              gap: 8px;
+              border-bottom: 1px solid #333;
+              overflow-x: auto;
+            "
+          >
+            <button
+              type="button"
+              class="quick-link-btn-small"
+              data-url="https://subsplease.org"
+            >
               🌸 SubsPlease
             </button>
-                <button type="button" class="quick-link-btn-small" data-url="https://animetosho.org/">
-                📦 Anime Tosho
+            <button
+              type="button"
+              class="quick-link-btn-small"
+              data-url="https://animetosho.org/"
+            >
+              📦 Anime Tosho
             </button>
-            <button type="button" class="quick-link-btn-small" data-url="https://nyaa.si">
+            <button
+              type="button"
+              class="quick-link-btn-small"
+              data-url="https://nyaa.si"
+            >
               🐱 Nyaa.si
             </button>
-            <button type="button" class="quick-link-btn-small" data-url="https://1337x.to">
+            <button
+              type="button"
+              class="quick-link-btn-small"
+              data-url="https://1337x.to"
+            >
               ⚡ 1337x
             </button>
-            <button type="button" class="quick-link-btn-small" data-url="https://thepiratebay.org">
+            <button
+              type="button"
+              class="quick-link-btn-small"
+              data-url="https://thepiratebay.org"
+            >
               🏴‍☠️ TPB
             </button>
           </div>
 
           <!-- Browser View Info -->
-          <div id="browser-active-msg" style="display: none; padding: 15px 20px; background: rgba(16, 185, 129, 0.1); border-bottom: 1px solid rgba(16, 185, 129, 0.3);">
-            <p style="color: #10b981; font-size: 13px; margin: 0;">
-              ✓ <strong>Browser active!</strong> Click the purple "▶ Play" button next to any magnet link to load it directly
+          <div
+            id="browser-active-msg"
+            style="
+              display: none;
+              padding: 15px 20px;
+              background: rgba(16, 185, 129, 0.1);
+              border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+            "
+          >
+            <p style="color: #10b981; font-size: 13px; margin: 0">
+              ✓ <strong>Browser active!</strong> Click the purple "▶ Play"
+              button next to any magnet link to load it directly
             </p>
           </div>
 
           <!-- Browser placeholder -->
-          <div id="browser-placeholder" style="flex: 1; display: flex; align-items: center; justify-content: center; background: #1a1a1a; position: relative; overflow: hidden;">
-            <div id="placeholder-text" style="text-align: center; color: #666;">
-              <div style="font-size: 48px; margin-bottom: 20px;">🌐</div>
-              <p style="font-size: 18px; margin-bottom: 10px; color: #aaa;">Click a site above or enter a URL</p>
-              <p style="font-size: 14px;">The browser will appear here</p>
+          <div
+            id="browser-placeholder"
+            style="
+              flex: 1;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: #1a1a1a;
+              position: relative;
+              overflow: hidden;
+            "
+          >
+            <div id="placeholder-text" style="text-align: center; color: #666">
+              <div style="font-size: 48px; margin-bottom: 20px">🌐</div>
+              <p style="font-size: 18px; margin-bottom: 10px; color: #aaa">
+                Click a site above or enter a URL
+              </p>
+              <p style="font-size: 14px">The browser will appear here</p>
             </div>
-            <div id="browser-loading" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; align-items: center; justify-content: center; z-index: 10;">
-              <div style="text-align: center;">
-                <div style="width: 50px; height: 50px; border: 4px solid #333; border-top-color: #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                <p style="color: #aaa; font-size: 16px;">Loading...</p>
+            <div
+              id="browser-loading"
+              style="
+                display: none;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: #1a1a1a;
+                align-items: center;
+                justify-content: center;
+                z-index: 10;
+              "
+            >
+              <div style="text-align: center">
+                <div
+                  style="
+                    width: 50px;
+                    height: 50px;
+                    border: 4px solid #333;
+                    border-top-color: #8b5cf6;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 20px;
+                  "
+                ></div>
+                <p style="color: #aaa; font-size: 16px">Loading...</p>
               </div>
             </div>
-            <webview  id="browser-webview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;" partition="persist:browser"></webview>
+            <webview
+              id="browser-webview"
+              style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                display: none;
+              "
+              partition="persist:browser"
+            ></webview>
           </div>
         </div>
       </div>
 
-      <div id="magnet-error" class="magnet-form-error" style="display: none"></div>
-      <div id="loading" class="loading" style="display: none;">
+      <div
+        id="magnet-error"
+        class="magnet-form-error"
+        style="display: none"
+      ></div>
+      <div id="loading" class="loading" style="display: none">
         <p>Parsing torrent file...</p>
       </div>
     </main>
-    </main>
-    
-
 
     <footer class="footer">
       Created with ❤️ by
@@ -139,51 +310,53 @@
       let torrentParser;
 
       // Initialize when page loads
-      document.addEventListener('DOMContentLoaded', function() {
+      document.addEventListener("DOMContentLoaded", function () {
         // Show Browse Sites tab only in Electron
         if (window.electronAPI) {
-          document.getElementById('browse-tab-btn').style.display = 'inline-block';
+          document.getElementById("browse-tab-btn").style.display =
+            "inline-block";
           // Apply Electron fullscreen layout
-          document.body.classList.add('electron-app');
+          document.body.classList.add("electron-app");
           // Add Electron-specific stylesheet
-          const electronStyle = document.createElement('link');
-          electronStyle.rel = 'stylesheet';
-          electronStyle.href = '/libs/styles/electron.css';
+          const electronStyle = document.createElement("link");
+          electronStyle.rel = "stylesheet";
+          electronStyle.href = "/libs/styles/electron.css";
           document.head.appendChild(electronStyle);
         }
-        
+
         torrentParser = new TorrentParser();
         setupEventListeners();
-        
+
         // Check if there's a magnet link in the URL query parameters
         const urlParams = new URLSearchParams(window.location.search);
-        const magnetUrl = urlParams.get('magnet');
-        if (magnetUrl && magnetUrl.startsWith('magnet:')) {
+        const magnetUrl = urlParams.get("magnet");
+        if (magnetUrl && magnetUrl.startsWith("magnet:")) {
           // Auto-fill the magnet input and redirect to player
-          document.getElementById('magnet-url').value = magnetUrl;
+          document.getElementById("magnet-url").value = magnetUrl;
           setTimeout(() => {
-            window.location.href = "/player?url=" + encodeURIComponent(magnetUrl);
+            window.location.href =
+              "/player?url=" + encodeURIComponent(magnetUrl);
           }, 500);
         }
       });
 
       function setupEventListeners() {
         // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-          btn.addEventListener('click', function() {
+        document.querySelectorAll(".tab-btn").forEach((btn) => {
+          btn.addEventListener("click", function () {
             const tabName = this.dataset.tab;
             switchTab(tabName);
           });
         });
 
         // Browser functionality with BrowserView
-        const siteUrlInput = document.getElementById('site-url');
-        const loadSiteBtn = document.getElementById('load-site-btn');
-        const backBtn = document.getElementById('back-btn');
-        const forwardBtn = document.getElementById('forward-btn');
-        const refreshBtn = document.getElementById('refresh-btn');
-        const closeBrowserBtn = document.getElementById('close-browser-btn');
-        
+        const siteUrlInput = document.getElementById("site-url");
+        const loadSiteBtn = document.getElementById("load-site-btn");
+        const backBtn = document.getElementById("back-btn");
+        const forwardBtn = document.getElementById("forward-btn");
+        const refreshBtn = document.getElementById("refresh-btn");
+        const closeBrowserBtn = document.getElementById("close-browser-btn");
+
         let webview = null;
         let browserActive = false;
         let loadingTimeout = null;
@@ -191,89 +364,97 @@
         async function loadUrl(url) {
           try {
             if (!webview) {
-              webview = document.getElementById('browser-webview');
-              
+              webview = document.getElementById("browser-webview");
+
               // Wait for webview to be ready before setting up listeners
               await new Promise((resolve) => {
                 if (webview.getWebContentsId) {
                   resolve();
                 } else {
-                  webview.addEventListener('dom-ready', () => resolve(), { once: true });
+                  webview.addEventListener("dom-ready", () => resolve(), {
+                    once: true,
+                  });
                 }
               });
-              
+
               // Setup webview event listeners
-              webview.addEventListener('did-start-loading', () => {
-                document.getElementById('browser-loading').style.display = 'flex';
-                
+              webview.addEventListener("did-start-loading", () => {
+                document.getElementById("browser-loading").style.display =
+                  "flex";
+
                 // Clear any existing timeout
                 if (loadingTimeout) clearTimeout(loadingTimeout);
-                
+
                 // Hide loading after max 3 seconds
                 loadingTimeout = setTimeout(() => {
-                  document.getElementById('browser-loading').style.display = 'none';
+                  document.getElementById("browser-loading").style.display =
+                    "none";
                 }, 3000);
               });
-              
-              webview.addEventListener('did-finish-load', () => {
-                console.log('Page loaded');
-                document.getElementById('browser-loading').style.display = 'none';
+
+              webview.addEventListener("did-finish-load", () => {
+                console.log("Page loaded");
+                document.getElementById("browser-loading").style.display =
+                  "none";
                 if (loadingTimeout) clearTimeout(loadingTimeout);
                 injectMagnetButtons();
               });
-              
-              webview.addEventListener('did-fail-load', () => {
-                document.getElementById('browser-loading').style.display = 'none';
+
+              webview.addEventListener("did-fail-load", () => {
+                document.getElementById("browser-loading").style.display =
+                  "none";
               });
-              
-              webview.addEventListener('did-navigate-in-page', () => {
+
+              webview.addEventListener("did-navigate-in-page", () => {
                 injectMagnetButtons();
               });
-              
+
               // Listen for console messages from injected script
-              webview.addEventListener('console-message', (e) => {
-                if (e.message && e.message.startsWith('MKV_PLAY:')) {
-                  const magnetUrl = e.message.replace('MKV_PLAY:', '');
+              webview.addEventListener("console-message", (e) => {
+                if (e.message && e.message.startsWith("MKV_PLAY:")) {
+                  const magnetUrl = e.message.replace("MKV_PLAY:", "");
                   window.location.href = `/player?url=${encodeURIComponent(magnetUrl)}`;
                 }
               });
-              
-              webview.addEventListener('will-navigate', (e) => {
-                if (e.url.startsWith('magnet:')) {
+
+              webview.addEventListener("will-navigate", (e) => {
+                if (e.url.startsWith("magnet:")) {
                   e.preventDefault();
                 }
               });
-              
-              webview.addEventListener('new-window', (e) => {
+
+              webview.addEventListener("new-window", (e) => {
                 e.preventDefault();
-                if (e.url.startsWith('magnet:')) {
+                if (e.url.startsWith("magnet:")) {
                   // Already handled via console-message
-                } else if (e.url.startsWith('http')) {
+                } else if (e.url.startsWith("http")) {
                   window.electronAPI?.openExternal(e.url);
                 }
               });
             }
-            
+
             // Show loading, hide placeholder text
-            document.getElementById('placeholder-text').style.display = 'none';
-            document.getElementById('browser-loading').style.display = 'flex';
-            const placeholder = document.getElementById('browser-placeholder');
-            placeholder.style.alignItems = 'stretch';
-            placeholder.style.justifyContent = 'stretch';
-            webview.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; ';
+            document.getElementById("placeholder-text").style.display = "none";
+            document.getElementById("browser-loading").style.display = "flex";
+            const placeholder = document.getElementById("browser-placeholder");
+            placeholder.style.alignItems = "stretch";
+            placeholder.style.justifyContent = "stretch";
+            webview.style.cssText =
+              "position: absolute; top: 0; left: 0; width: 100%; height: 100%; ";
             webview.src = url;
-            
+
             browserActive = true;
-            document.getElementById('browser-active-msg').style.display = 'block';
+            document.getElementById("browser-active-msg").style.display =
+              "block";
           } catch (error) {
-            console.error('Failed to load URL:', error);
-            showError('Failed to load website: ' + error.message);
+            console.error("Failed to load URL:", error);
+            showError("Failed to load website: " + error.message);
           }
         }
-        
+
         function injectMagnetButtons() {
           if (!webview) return;
-          
+
           const injectionScript = `
             (function() {
               if (window.magnetButtonsInjected) return;
@@ -342,22 +523,22 @@
               observer.observe(document.body, { childList: true, subtree: true });
             })();
           `;
-          
-          webview.executeJavaScript(injectionScript).catch(err => {
-            console.error('Failed to inject buttons:', err);
+
+          webview.executeJavaScript(injectionScript).catch((err) => {
+            console.error("Failed to inject buttons:", err);
           });
         }
 
         if (loadSiteBtn) {
-          loadSiteBtn.addEventListener('click', async () => {
+          loadSiteBtn.addEventListener("click", async () => {
             const url = siteUrlInput.value.trim();
             if (url) {
-              await loadUrl(url.startsWith('http') ? url : 'https://' + url);
+              await loadUrl(url.startsWith("http") ? url : "https://" + url);
             }
           });
 
-          siteUrlInput.addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter') {
+          siteUrlInput.addEventListener("keypress", async (e) => {
+            if (e.key === "Enter") {
               loadSiteBtn.click();
             }
           });
@@ -365,92 +546,97 @@
 
         // Navigation buttons
         if (backBtn) {
-          backBtn.addEventListener('click', () => {
+          backBtn.addEventListener("click", () => {
             if (webview) webview.goBack();
           });
         }
-        
+
         if (forwardBtn) {
-          forwardBtn.addEventListener('click', () => {
+          forwardBtn.addEventListener("click", () => {
             if (webview) webview.goForward();
           });
         }
-        
+
         if (refreshBtn) {
-          refreshBtn.addEventListener('click', () => {
+          refreshBtn.addEventListener("click", () => {
             if (webview) webview.reload();
           });
         }
 
         if (closeBrowserBtn) {
-          closeBrowserBtn.addEventListener('click', () => {
+          closeBrowserBtn.addEventListener("click", () => {
             if (webview) {
-              webview.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;';
-              webview.src = 'about:blank';
+              webview.style.cssText =
+                "position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;";
+              webview.src = "about:blank";
             }
-            document.getElementById('placeholder-text').style.display = 'block';
-            document.getElementById('browser-active-msg').style.display = 'none';
+            document.getElementById("placeholder-text").style.display = "block";
+            document.getElementById("browser-active-msg").style.display =
+              "none";
             browserActive = false;
           });
         }
 
         // Quick link buttons
-        document.querySelectorAll('.quick-link-btn-small').forEach(btn => {
-          btn.addEventListener('click', async function() {
-            const url = this.getAttribute('data-url');
+        document.querySelectorAll(".quick-link-btn-small").forEach((btn) => {
+          btn.addEventListener("click", async function () {
+            const url = this.getAttribute("data-url");
             siteUrlInput.value = url;
             await loadUrl(url);
           });
         });
-       
 
         // Magnet form submission
-        document.getElementById("magnet-form").addEventListener("submit", function (e) {
-          e.preventDefault();
-          const url = document.getElementById("magnet-url").value.trim();
-          const errorDiv = document.getElementById("magnet-error");
-          if (url && url.startsWith("magnet:")) {
-            errorDiv.style.display = "none";
-            window.location.href = "/player?url=" + encodeURIComponent(url);
-          } else {
-            showError("Please enter a valid magnet URL.");
-          }
-        });
+        document
+          .getElementById("magnet-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+            const url = document.getElementById("magnet-url").value.trim();
+            const errorDiv = document.getElementById("magnet-error");
+            if (url && url.startsWith("magnet:")) {
+              errorDiv.style.display = "none";
+              window.location.href = "/player?url=" + encodeURIComponent(url);
+            } else {
+              showError("Please enter a valid magnet URL.");
+            }
+          });
 
         // Torrent form submission
-        document.getElementById("torrent-form").addEventListener("submit", function (e) {
-          e.preventDefault();
-          processTorrentFile();
-        });
+        document
+          .getElementById("torrent-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+            processTorrentFile();
+          });
 
         // File input handling
-        const fileInput = document.getElementById('torrent-file');
-        const uploadArea = document.getElementById('file-upload-area');
-        const chooseFileBtn = document.getElementById('choose-file-btn');
+        const fileInput = document.getElementById("torrent-file");
+        const uploadArea = document.getElementById("file-upload-area");
+        const chooseFileBtn = document.getElementById("choose-file-btn");
 
-        fileInput.addEventListener('change', handleFileSelect);
-        
+        fileInput.addEventListener("change", handleFileSelect);
+
         // Choose file button click handler
-        chooseFileBtn.addEventListener('click', function() {
+        chooseFileBtn.addEventListener("click", function () {
           fileInput.click();
         });
 
         // Drag and drop functionality
-        uploadArea.addEventListener('dragover', function(e) {
+        uploadArea.addEventListener("dragover", function (e) {
           e.preventDefault();
-          uploadArea.classList.add('drag-over');
+          uploadArea.classList.add("drag-over");
         });
 
-        uploadArea.addEventListener('dragleave', function(e) {
+        uploadArea.addEventListener("dragleave", function (e) {
           e.preventDefault();
-          uploadArea.classList.remove('drag-over');
+          uploadArea.classList.remove("drag-over");
         });
 
-        uploadArea.addEventListener('drop', function(e) {
+        uploadArea.addEventListener("drop", function (e) {
           e.preventDefault();
-          uploadArea.classList.remove('drag-over');
+          uploadArea.classList.remove("drag-over");
           const files = e.dataTransfer.files;
-          if (files.length > 0 && files[0].name.endsWith('.torrent')) {
+          if (files.length > 0 && files[0].name.endsWith(".torrent")) {
             fileInput.files = files;
             handleFileSelect();
           } else {
@@ -461,26 +647,28 @@
 
       function switchTab(tabName) {
         // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-          btn.classList.remove('active');
+        document.querySelectorAll(".tab-btn").forEach((btn) => {
+          btn.classList.remove("active");
         });
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        document
+          .querySelector(`[data-tab="${tabName}"]`)
+          .classList.add("active");
 
         // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-          content.classList.remove('active');
+        document.querySelectorAll(".tab-content").forEach((content) => {
+          content.classList.remove("active");
           // Hide browser tab properly
-          if (content.id === 'browser-tab') {
-            content.style.display = 'none';
+          if (content.id === "browser-tab") {
+            content.style.display = "none";
           }
         });
-        
+
         const activeTab = document.getElementById(`${tabName}-tab`);
-        activeTab.classList.add('active');
-        
+        activeTab.classList.add("active");
+
         // Show browser tab with flex layout
-        if (tabName === 'browser') {
-          activeTab.style.display = 'flex';
+        if (tabName === "browser") {
+          activeTab.style.display = "flex";
         }
 
         // Clear errors
@@ -488,28 +676,28 @@
       }
 
       function handleFileSelect() {
-        const fileInput = document.getElementById('torrent-file');
-        const fileInfo = document.getElementById('file-info');
-        const fileName = document.getElementById('file-name');
+        const fileInput = document.getElementById("torrent-file");
+        const fileInfo = document.getElementById("file-info");
+        const fileName = document.getElementById("file-name");
 
         if (fileInput.files.length > 0) {
           const file = fileInput.files[0];
-          if (file.name.endsWith('.torrent')) {
+          if (file.name.endsWith(".torrent")) {
             fileName.textContent = `Selected: ${file.name}`;
-            fileInfo.style.display = 'block';
+            fileInfo.style.display = "block";
             hideError();
           } else {
             showError("Please select a valid .torrent file.");
-            fileInfo.style.display = 'none';
+            fileInfo.style.display = "none";
           }
         } else {
-          fileInfo.style.display = 'none';
+          fileInfo.style.display = "none";
         }
       }
 
       async function processTorrentFile() {
-        const fileInput = document.getElementById('torrent-file');
-        const loadingDiv = document.getElementById('loading');
+        const fileInput = document.getElementById("torrent-file");
+        const loadingDiv = document.getElementById("loading");
 
         if (fileInput.files.length === 0) {
           showError("Please select a torrent file first.");
@@ -517,23 +705,22 @@
         }
 
         const file = fileInput.files[0];
-        loadingDiv.style.display = 'block';
+        loadingDiv.style.display = "block";
         hideError();
 
         try {
           const arrayBuffer = await file.arrayBuffer();
           const uint8Array = new Uint8Array(arrayBuffer);
-          
+
           const magnetUrl = await torrentParser.parseTorrentFile(uint8Array);
-          
-          loadingDiv.style.display = 'none';
-          
+
+          loadingDiv.style.display = "none";
+
           // Redirect to player with the generated magnet URL
           window.location.href = "/player?url=" + encodeURIComponent(magnetUrl);
-          
         } catch (error) {
-          loadingDiv.style.display = 'none';
-          console.error('Error parsing torrent file:', error);
+          loadingDiv.style.display = "none";
+          console.error("Error parsing torrent file:", error);
           showError(`Failed to parse torrent file: ${error.message}`);
         }
       }
