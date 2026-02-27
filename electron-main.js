@@ -136,12 +136,21 @@ function stopServer() {
     serverProcess = null;
   }
 }
-
 function createMenu() {
   const template = [
     {
       label: "File",
       submenu: [
+        {
+          label: "Settings",
+          accelerator: "CmdOrCtrl+,",
+          click: () => {
+            if (mainWindow) {
+              mainWindow.loadURL(`http://localhost:${PORT}/desktop/settings`);
+            }
+          },
+        },
+        { type: "separator" },
         {
           label: "Reload",
           accelerator: "CmdOrCtrl+R",
@@ -158,52 +167,13 @@ function createMenu() {
         },
         { type: "separator" },
         {
-          label: "Settings",
-          accelerator: "CmdOrCtrl+,",
-          click: () => {
-            if (mainWindow) {
-              mainWindow.loadURL(`http://localhost:${PORT}/desktop/settings`);
-            }
-          },
-        },
-        { type: "separator" },
-        {
           role: "quit",
         },
       ],
     },
-    {
-      label: "View",
-      submenu: [
-        {
-          label: "Toggle Developer Tools",
-          accelerator:
-            process.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",
-          click: () => {
-            mainWindow.webContents.toggleDevTools();
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Toggle Fullscreen",
-          accelerator: process.platform === "darwin" ? "Ctrl+Command+F" : "F11",
-          click: () => {
-            mainWindow.setFullScreen(!mainWindow.isFullScreen());
-          },
-        },
 
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-      ],
-    },
     {
-      label: "Window",
-      submenu: [{ role: "minimize" }, { role: "close" }],
-    },
-    {
-      role: "help",
+      label: "Help",
       submenu: [
         {
           label: "About MKV Video Player",
@@ -213,8 +183,32 @@ function createMenu() {
               title: "About",
               message: "MKV Video Player",
               detail:
-                "Version 1.0.0\n\nA powerful video player with torrent streaming and subtitle support.",
+                "A professional video player with torrent streaming and subtitle support.\n\nDeveloped by wdallo.\nGitHub: https://github.com/wdallo/MKV-Player-WebTorrent",
             });
+          },
+        },
+        {
+          label: "Documentation",
+          click: async () => {
+            shell.openExternal(
+              "https://github.com/wdallo/MKV-Player-WebTorrent#readme",
+            );
+          },
+        },
+        {
+          label: "Report Issue",
+          click: async () => {
+            shell.openExternal(
+              "https://github.com/wdallo/MKV-Player-WebTorrent/issues",
+            );
+          },
+        },
+        {
+          label: "GitHub Repo",
+          click: async () => {
+            shell.openExternal(
+              "https://github.com/wdallo/MKV-Player-WebTorrent",
+            );
           },
         },
       ],
