@@ -10,7 +10,7 @@ import {
 import { fileURLToPath } from "url";
 import path from "path";
 import { spawn } from "child_process";
-
+process.env.APP_VERSION = app.getVersion();
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

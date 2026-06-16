@@ -11,12 +11,14 @@ export function renderPlayer(req, res) {
   res.render("player", {
     magnet,
     pageTitle: "MKV Player - Player",
-    appVersion: process.env.npm_package_version || "dev",
+    appVersion:
+      process.env.APP_VERSION || process.env.npm_package_version || "dev",
   });
 }
 export function renderIndex(req, res) {
   res.render("index", {
     pageTitle: "MKV Player - Enter Magnet",
-    appVersion: process.env.npm_package_version || "dev",
+    appVersion:
+      process.env.APP_VERSION || process.env.npm_package_version || "dev",
   });
 }
