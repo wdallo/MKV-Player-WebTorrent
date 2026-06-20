@@ -5,11 +5,11 @@
     <title>Embedded MKV Video Player</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <link rel="preload" as="style" href="/libs/styles/plyr.css" />
-    <link rel="stylesheet" href="/libs/styles/plyr.css" />
-    <link rel="stylesheet" href="/libs/styles/embed.css" />
+    <link rel="preload" as="style" href="/libs/styles/plyr-min.css" />
+    <link rel="stylesheet" href="/libs/styles/plyr-min.css" />
+    <link rel="stylesheet" href="/libs/styles/embed-min.css" />
 
-    <script src="/libs/octopus/subtitles-octopus.js"></script>
+    <script src="/libs/octopus/subtitles-octopus-min.js"></script>
   </head>
   <body>
     <main class="container">
@@ -64,7 +64,7 @@
       <button id="retry-btn" class="retry-button">Retry Video Load</button>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+    <script src="../libs/plyr.polyfilled-min.js"></script>
     <script type="module">
       // Import required functions and classes
       import { isValidMagnet } from "../utils/magnetValidator.js";

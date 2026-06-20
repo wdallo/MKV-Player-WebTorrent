@@ -50,7 +50,7 @@ class SubtitlesOctopus {
     // Detect WebAssembly support and select worker
     this.supportsWebAssembly = SubtitlesOctopus.detectWebAssembly();
     this.workerUrl = this.supportsWebAssembly
-      ? options.workerUrl || "subtitles-octopus-worker.js"
+      ? options.workerUrl || "subtitles-octopus-worker-min.js"
       : options.legacyWorkerUrl || "subtitles-octopus-worker-legacy.js";
 
     this.initImageDataPolyfill();
@@ -68,7 +68,7 @@ class SubtitlesOctopus {
         typeof WebAssembly.instantiate === "function"
       ) {
         const module = new WebAssembly.Module(
-          Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00)
+          Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00),
         );
         return (
           module instanceof WebAssembly.Module &&
@@ -89,7 +89,7 @@ class SubtitlesOctopus {
         return;
       } catch (e) {
         console.log(
-          "detected that ImageData is not constructable despite browser saying so"
+          "detected that ImageData is not constructable despite browser saying so",
         );
       }
     }
@@ -180,14 +180,14 @@ class SubtitlesOctopus {
         if (this.video.nextSibling) {
           this.video.parentNode.insertBefore(
             this.canvasParent,
-            this.video.nextSibling
+            this.video.nextSibling,
           );
         } else {
           this.video.parentNode.appendChild(this.canvasParent);
         }
       } else {
         this.workerError(
-          "Don't know where to render: you should give video or canvas in options."
+          "Don't know where to render: you should give video or canvas in options.",
         );
       }
     }
@@ -211,7 +211,7 @@ class SubtitlesOctopus {
     this.hasAlphaBug = prePut[1] !== postPut[1];
     if (this.hasAlphaBug) {
       console.log(
-        "Detected a browser having issue with transparent pixels, applying workaround"
+        "Detected a browser having issue with transparent pixels, applying workaround",
       );
     }
   }
@@ -234,22 +234,22 @@ class SubtitlesOctopus {
     document.addEventListener(
       "fullscreenchange",
       this.resizeWithTimeout,
-      false
+      false,
     );
     document.addEventListener(
       "mozfullscreenchange",
       this.resizeWithTimeout,
-      false
+      false,
     );
     document.addEventListener(
       "webkitfullscreenchange",
       this.resizeWithTimeout,
-      false
+      false,
     );
     document.addEventListener(
       "msfullscreenchange",
       this.resizeWithTimeout,
-      false
+      false,
     );
     window.addEventListener("resize", this.resizeWithTimeout, false);
 
@@ -264,7 +264,7 @@ class SubtitlesOctopus {
       this.video.addEventListener(
         "loadedmetadata",
         this.onLoadedMetadata,
-        false
+        false,
       );
     }
   }
@@ -323,12 +323,12 @@ class SubtitlesOctopus {
       if (typeof blendTime !== "undefined") {
         console.log(
           `render: ${Math.round(
-            data.spentTime - blendTime
+            data.spentTime - blendTime,
           )} ms, blend: ${Math.round(
-            blendTime
+            blendTime,
           )} ms, draw: ${drawTime} ms; TOTAL=${Math.round(
-            data.spentTime + drawTime
-          )} ms`
+            data.spentTime + drawTime,
+          )} ms`,
         );
       } else {
         console.log(`${Math.round(data.spentTime)} ms (+ ${drawTime} ms draw)`);
@@ -351,8 +351,8 @@ class SubtitlesOctopus {
       const drawTime = Math.round(performance.now() - beforeDrawTime);
       console.log(
         `${data.bitmaps.length} bitmaps, libass: ${Math.round(
-          data.libassTime
-        )}ms, decode: ${Math.round(data.decodeTime)}ms, draw: ${drawTime}ms`
+          data.libassTime,
+        )}ms, decode: ${Math.round(data.decodeTime)}ms, draw: ${drawTime}ms`,
       );
       this.renderStart = performance.now();
     }
@@ -476,7 +476,7 @@ class SubtitlesOctopus {
       videoSize = this.getVideoPosition();
       const newSize = this._computeCanvasSize(
         videoSize.width * this.pixelRatio,
-        videoSize.height * this.pixelRatio
+        videoSize.height * this.pixelRatio,
       );
       width = newSize.width;
       height = newSize.height;
@@ -489,7 +489,7 @@ class SubtitlesOctopus {
     if (!width || !height) {
       if (!this.video) {
         console.error(
-          "width or height is 0. You should specify width & height for resize."
+          "width or height is 0. You should specify width & height for resize.",
         );
       }
       return;
@@ -627,28 +627,28 @@ class SubtitlesOctopus {
       this.video.removeEventListener(
         "loadedmetadata",
         this.onLoadedMetadata,
-        false
+        false,
       );
 
       document.removeEventListener(
         "fullscreenchange",
         this.resizeWithTimeout,
-        false
+        false,
       );
       document.removeEventListener(
         "mozfullscreenchange",
         this.resizeWithTimeout,
-        false
+        false,
       );
       document.removeEventListener(
         "webkitfullscreenchange",
         this.resizeWithTimeout,
-        false
+        false,
       );
       document.removeEventListener(
         "msfullscreenchange",
         this.resizeWithTimeout,
-        false
+        false,
       );
       window.removeEventListener("resize", this.resizeWithTimeout, false);
 
@@ -718,7 +718,7 @@ class SubtitlesOctopus {
         target: "get-events",
       },
       (data) => onSuccess(data.events),
-      onError
+      onError,
     );
   }
 
@@ -762,7 +762,7 @@ class SubtitlesOctopus {
         target: "get-styles",
       },
       (data) => onSuccess(data.styles),
-      onError
+      onError,
     );
   }
 

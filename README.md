@@ -178,7 +178,9 @@ MKV-Player-WebTorrent/
 │   │
 │   └── 📂 octopus/               # SubtitlesOctopus renderer
 │       ├── subtitles-octopus.js  # ASS/SSA subtitle renderer
+│       ├── subtitles-octopus-min.js  # ASS/SSA subtitle renderer (Minify Version)
 │       ├── subtitles-octopus-worker.js
+│       ├── subtitles-octopus-worker.js # Minify Version
 │       ├── subtitles-octopus-worker-legacy.js
 │       └── subtitles-octopus-worker.wasm
 │
