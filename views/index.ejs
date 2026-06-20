@@ -178,13 +178,7 @@
             >
               🌸 SubsPlease
             </button>
-            <button
-              type="button"
-              class="quick-link-btn-small"
-              data-url="https://animetosho.org/"
-            >
-              📦 Anime Tosho
-            </button>
+
             <button
               type="button"
               class="quick-link-btn-small"
@@ -378,7 +372,12 @@
               });
 
               // Setup webview event listeners
-              webview.addEventListener("did-start-loading", () => {
+              webview.addEventListener("did-start-loading", (e) => {
+                // Ignore iframe loading to prevent multiple triggers
+                if (e.isMainFrame === false) return;
+
+                // Disable user clicks on the webview during load to prevent duplicate requests
+                webview.style.pointerEvents = "none";
                 document.getElementById("browser-loading").style.display =
                   "flex";
 
@@ -389,18 +388,35 @@
                 loadingTimeout = setTimeout(() => {
                   document.getElementById("browser-loading").style.display =
                     "none";
+                  // Re-enable clicks if timeout expires
+                  webview.style.pointerEvents = "auto";
                 }, 3000);
               });
 
               webview.addEventListener("did-finish-load", () => {
                 console.log("Page loaded");
+                // Re-enable user clicks once the page is ready
+                webview.style.pointerEvents = "auto";
                 document.getElementById("browser-loading").style.display =
                   "none";
                 if (loadingTimeout) clearTimeout(loadingTimeout);
                 injectMagnetButtons();
               });
 
-              webview.addEventListener("did-fail-load", () => {
+              webview.addEventListener("did-fail-load", (e) => {
+                // Ignore errors coming from sub-frames or ads
+                if (e.isMainFrame === false) return;
+
+                // Ignore ERR_ABORTED (-3) if it still slips through
+                if (e.errorCode === -3) {
+                  console.log(
+                    "Navigation was aborted by a new request. Ignoring error.",
+                  );
+                  return;
+                }
+
+                // Re-enable user clicks if a hard network error happens
+                webview.style.pointerEvents = "auto";
                 document.getElementById("browser-loading").style.display =
                   "none";
               });

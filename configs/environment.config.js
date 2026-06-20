@@ -99,7 +99,7 @@ export const SECURITY_CONFIG = {
  */
 export const TORRENT_CONFIG = {
   // WebTorrent client settings
-  MAX_CONNECTIONS: parseInt(process.env.MAX_CONNECTIONS || "50", 10),
+  MAX_CONNECTIONS: parseInt(process.env.MAX_CONNECTIONS || "200", 10),
   UPLOAD_LIMIT: 2 * MB, // 2 MB/s
   DOWNLOAD_LIMIT: -1, // Unlimited
   CHUNK_SIZE: 16 * KB,
