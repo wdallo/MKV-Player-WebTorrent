@@ -14,6 +14,43 @@ process.env.APP_VERSION = app.getVersion();
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Override console.error to filter out Electron internal GUEST_VIEW noise
+const originalConsoleError = console.error;
+
+console.error = function (...args) {
+  const errorMessage = args.join(" ");
+
+  // Check if the error message contains the internal webview manager abort trace
+  if (
+    errorMessage.includes("GUEST_VIEW_MANAGER_CALL") &&
+    errorMessage.includes("ERR_ABORTED")
+  ) {
+    // Silence this exact error log
+    return;
+  }
+
+  // Pass through all other legitimate errors
+  originalConsoleError.apply(console, args);
+};
+// Catch and silence global internal Electron promise cancellations (-3 / ERR_ABORTED)
+process.on("unhandledRejection", (reason) => {
+  if (reason) {
+    // Check all possible variations of the Chromium cancellation error properties
+    const isAbort =
+      reason.code === "ERR_ABORTED" ||
+      reason.errno === -3 ||
+      String(reason).includes("ERR_ABORTED") ||
+      String(reason).includes("-3");
+
+    if (isAbort) {
+      // Intentionally ignore internal browser cancellations to keep the terminal logs clean
+      return;
+    }
+  }
+
+  // Log all other legitimate backend unhandled exceptions as normal
+  console.error("Unhandled Rejection:", reason);
+});
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -56,6 +93,14 @@ async function createWindow() {
     title: "MKV Video Player",
   });
 
+  // Intercept webview attachment to block popup windows from causing cancellations
+  mainWindow.webContents.on("did-attach-webview", (event, webContents) => {
+    webContents.setWindowOpenHandler(() => {
+      console.log("Blocked a pop-up window from webview");
+      return { action: "deny" };
+    });
+  });
+
   // Wait for window to be ready before showing
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
@@ -95,7 +140,7 @@ async function createWindow() {
     }
   });
 
-  // Handle external links
+  // Handle external links from main window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
@@ -255,6 +300,12 @@ ipcMain.handle("load-browser-url", async (event, url) => {
       mainWindow.setBrowserView(browserView);
     }
 
+    // Block pop-up windows inside the BrowserView as well to avoid cancellations
+    browserView.webContents.setWindowOpenHandler(() => {
+      console.log("Blocked a pop-up window from BrowserView");
+      return { action: "deny" };
+    });
+
     // Initial bounds - will be updated by renderer with exact offset
     const [width, height] = mainWindow.getContentSize();
     browserView.setBounds({
@@ -288,12 +339,12 @@ ipcMain.handle("load-browser-url", async (event, url) => {
 
     // Inject script to add play buttons next to magnet links
     browserView.webContents.on("did-finish-load", () => {
-      injectMagnetButtons();
+      if (typeof injectMagnetButtons === "function") injectMagnetButtons();
     });
 
     // Also inject on navigation
     browserView.webContents.on("did-navigate-in-page", () => {
-      injectMagnetButtons();
+      if (typeof injectMagnetButtons === "function") injectMagnetButtons();
     });
 
     // Intercept magnet links - prevent OS from opening them
@@ -308,263 +359,23 @@ ipcMain.handle("load-browser-url", async (event, url) => {
       }
     });
 
-    // Also handle new-window events for magnet links
-    browserView.webContents.setWindowOpenHandler(({ url }) => {
-      if (url.startsWith("magnet:")) {
-        if (mainWindow) {
-          mainWindow.loadURL(
-            `http://localhost:${PORT}/player?url=${encodeURIComponent(url)}`,
-          );
-        }
-        return { action: "deny" };
-      }
-      return { action: "deny" };
-    });
-
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// Function to inject play buttons next to magnet links
-function injectMagnetButtons() {
-  if (!browserView) return;
+// Complete initialization hook
+app.whenReady().then(createWindow);
 
-  const injectionScript = `
-    (function() {
-      // Remove existing buttons first
-      document.querySelectorAll('.mkv-play-btn').forEach(btn => btn.remove());
-      
-      // Add CSS for play buttons
-      if (!document.getElementById('mkv-play-style')) {
-        const style = document.createElement('style');
-        style.id = 'mkv-play-style';
-        style.textContent = \`
-          .mkv-play-btn {
-            display: inline-block;
-            margin-left: 8px;
-            padding: 4px 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white !important;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-            vertical-align: middle;
-          }
-          .mkv-play-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
-            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-          }
-          .mkv-play-btn:active {
-            transform: translateY(0);
-          }
-        \`;
-        document.head.appendChild(style);
-      }
-      
-      // Find all magnet links and add play buttons
-      const magnetLinks = document.querySelectorAll('a[href^="magnet:"]');
-      
-      magnetLinks.forEach(link => {
-        // Skip if button already exists
-        if (link.nextElementSibling && link.nextElementSibling.classList.contains('mkv-play-btn')) {
-          return;
-        }
-        
-        const playBtn = document.createElement('button');
-        playBtn.className = 'mkv-play-btn';
-        playBtn.innerHTML = '▶ Play';
-        playBtn.onclick = function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          const magnetUrl = link.getAttribute('href');
-          
-          // Send via console message to avoid OS intercepting magnet URL
-          console.log('MKV_PLAY:' + magnetUrl);
-        };
-        
-        // Insert after the link
-        link.parentNode.insertBefore(playBtn, link.nextSibling);
-      });
-      
-      // Monitor for dynamically added magnet links
-      const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-          mutation.addedNodes.forEach(function(node) {
-            if (node.nodeType === 1) {
-              const newMagnetLinks = node.querySelectorAll ? node.querySelectorAll('a[href^="magnet:"]') : [];
-              newMagnetLinks.forEach(link => {
-                if (!link.nextElementSibling || !link.nextElementSibling.classList.contains('mkv-play-btn')) {
-                  const playBtn = document.createElement('button');
-                  playBtn.className = 'mkv-play-btn';
-                  playBtn.innerHTML = '▶ Play';
-                  playBtn.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const magnetUrl = link.getAttribute('href');
-                    console.log('MKV_PLAY:' + magnetUrl);
-                  };
-                  link.parentNode.insertBefore(playBtn, link.nextSibling);
-                }
-              });
-            }
-          });
-        });
-      });
-      
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
-    })();
-  `;
-
-  browserView.webContents.executeJavaScript(injectionScript).catch((err) => {
-    console.error("Failed to inject script:", err);
-  });
-}
-
-// Handle custom protocol from injected buttons
-ipcMain.handle("load-magnet-from-browser", async (event, magnetUrl) => {
-  if (mainWindow) {
-    // Load the player with the magnet URL
-    mainWindow.loadURL(
-      `http://localhost:${PORT}/player?url=${encodeURIComponent(magnetUrl)}`,
-    );
-  }
-  return { success: true };
-});
-
-ipcMain.handle("close-browser-view", async () => {
-  if (browserView && mainWindow) {
-    mainWindow.removeBrowserView(browserView);
-    browserView.webContents.close();
-    browserView = null;
-  }
-  return { success: true };
-});
-
-ipcMain.handle("browser-navigate", async (event, action) => {
-  if (!browserView) return { success: false };
-
-  try {
-    switch (action) {
-      case "back":
-        if (browserView.webContents.canGoBack()) {
-          browserView.webContents.goBack();
-        }
-        break;
-      case "forward":
-        if (browserView.webContents.canGoForward()) {
-          browserView.webContents.goForward();
-        }
-        break;
-      case "refresh":
-        browserView.webContents.reload();
-        break;
-    }
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle("open-external", async (event, url) => {
-  shell.openExternal(url);
-  return { success: true };
-});
-
-// Get toolbar height from renderer
-ipcMain.handle(
-  "set-browser-view-offset",
-  async (event, offset, placeholderHeight) => {
-    if (browserView && mainWindow) {
-      const [width] = mainWindow.getContentSize();
-      // Use placeholderHeight if provided
-      const viewHeight = placeholderHeight || 600; // Default fallback
-      browserView.setBounds({
-        x: 0,
-        y: offset,
-        width: width,
-        height: viewHeight,
-      });
-    }
-    return { success: true };
-  },
-);
-
-// App event handlers
-app.whenReady().then(async () => {
-  // Set app user model ID for Windows
-  if (process.platform === "win32") {
-    app.setAppUserModelId("com.wdallo.mkv-video-player");
-  }
-  await createWindow();
-
-  app.on("activate", async () => {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) {
-      await createWindow();
-    }
-  });
-});
-
-// Quit when all windows are closed, except on macOS
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    stopServer();
     app.quit();
   }
 });
 
-app.on("before-quit", () => {
-  stopServer();
-});
-
-// Handle certificate errors
-app.on(
-  "certificate-error",
-  (event, webContents, url, error, certificate, callback) => {
-    if (isDev) {
-      // In development, ignore certificate errors
-      event.preventDefault();
-      callback(true);
-    } else {
-      // In production, use default behavior
-      callback(false);
-    }
-  },
-);
-
-// Security: Prevent new window creation
-app.on("web-contents-created", (event, contents) => {
-  contents.on("new-window", (navigationEvent, navigationUrl) => {
-    event.preventDefault();
-    shell.openExternal(navigationUrl);
-  });
-});
-
-// Handle protocol for deep linking (optional)
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient("mkv-player", process.execPath, [
-      path.resolve(process.argv[1]),
-    ]);
+app.on("activate", () => {
+  if (mainWindow === null) {
+    createWindow();
   }
-} else {
-  app.setAsDefaultProtocolClient("mkv-player");
-}
-
-// Handle restart-app signal
-ipcMain.on("restart-app", () => {
-  app.relaunch();
-  app.exit();
 });
