@@ -527,7 +527,7 @@ export class SubtitlesManager {
       this.octopus = new window.SubtitlesOctopus({
         video: this.videoElement,
         subContent: subtitleContent,
-        workerUrl: "/libs/octopus/subtitles-octopus-worker.js",
+        workerUrl: "/libs/octopus/subtitles-octopus-worker-min.js",
         fonts: ["/libs/fonts/ARIALBD.TTF", "/libs/fonts/NotoSansJP-Bold.ttf"],
         fallbackFont: "/libs/fonts/ARIALBD.TTF",
         renderMode: "wasm-blend",
