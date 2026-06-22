@@ -147,7 +147,7 @@
               id="site-url"
               placeholder="Enter torrent site URL..."
               class="magnet-form-input"
-              value="https://subsplease.org"
+              value=""
               style="flex: 1; margin: 0"
             />
             <button
@@ -581,12 +581,18 @@
 
         if (closeBrowserBtn) {
           closeBrowserBtn.addEventListener("click", () => {
-            if (webview) {
-              webview.style.cssText =
-                "position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;";
-              webview.src = "about:blank";
+            webview?.classList.add("hidden");
+            if (webview) webview.src = "about:blank";
+
+            const blankMessage = document.getElementById("placeholder-text");
+
+            if (blankMessage) {
+              blankMessage.style.display = "block";
+              blankMessage.style.position = "absolute";
+              blankMessage.style.top = "50%";
+              blankMessage.style.left = "50%";
+              blankMessage.style.transform = "translate(-50%, -50%)";
             }
-            document.getElementById("placeholder-text").style.display = "block";
             document.getElementById("browser-active-msg").style.display =
               "none";
             browserActive = false;
