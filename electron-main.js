@@ -14,42 +14,58 @@ process.env.APP_VERSION = app.getVersion();
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Override console.error to filter out Electron internal GUEST_VIEW noise
+/// Override console.error to filter out Electron internal GUEST_VIEW and navigation errors noise
 const originalConsoleError = console.error;
 
 console.error = function (...args) {
   const errorMessage = args.join(" ");
-
-  // Check if the error message contains the internal webview manager abort trace
-  if (
+  // FILTER [1]:
+  // Silence standard webview manager internal abort traces
+  const isGuestViewAbort =
     errorMessage.includes("GUEST_VIEW_MANAGER_CALL") &&
-    errorMessage.includes("ERR_ABORTED")
-  ) {
-    // Silence this exact error log
+    (errorMessage.includes("ERR_ABORTED") ||
+      errorMessage.includes("ERR_FAILED") ||
+      errorMessage.includes("-2"));
+
+  // FILTER [2]:
+  // Catch structural browser loading failure exceptions stemming from heavy proxy blocks
+  const isNativeNavigationFailure =
+    errorMessage.includes(
+      "Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL'",
+    ) ||
+    errorMessage.includes("rejectAndCleanup") ||
+    errorMessage.includes("thepiratebay.org");
+  if (isGuestViewAbort || isNativeNavigationFailure) {
+    // Intentionally silence these exact native internal navigation errors to keep terminal logs pristine
     return;
   }
-
-  // Pass through all other legitimate errors
+  // Pass through all other legitimate developer backend errors as normal
   originalConsoleError.apply(console, args);
 };
-// Catch and silence global internal Electron promise cancellations (-3 / ERR_ABORTED)
+// Catch and silence global internal Electron promise cancellations and network frame drops
 process.on("unhandledRejection", (reason) => {
   if (reason) {
-    // Check all possible variations of the Chromium cancellation error properties
-    const isAbort =
-      reason.code === "ERR_ABORTED" ||
-      reason.errno === -3 ||
-      String(reason).includes("ERR_ABORTED") ||
-      String(reason).includes("-3");
+    const reasonStr = String(reason);
 
-    if (isAbort) {
-      // Intentionally ignore internal browser cancellations to keep the terminal logs clean
+    // Check all possible variations of the Chromium cancellation and failure error properties
+    const isNetworkCancel =
+      reason.code === "ERR_ABORTED" ||
+      reason.code === "ERR_FAILED" ||
+      reason.errno === -3 ||
+      reason.errno === -2 ||
+      reasonStr.includes("ERR_ABORTED") ||
+      reasonStr.includes("ERR_FAILED") ||
+      reasonStr.includes("-3") ||
+      reasonStr.includes("-2") ||
+      reasonStr.includes("thepiratebay.org");
+
+    if (isNetworkCancel) {
+      // Ignore background network drop cancellations
       return;
     }
   }
-
   // Log all other legitimate backend unhandled exceptions as normal
-  console.error("Unhandled Rejection:", reason);
+  originalConsoleError.apply(console, ["Unhandled Rejection:", reason]);
 });
 
 // Keep a global reference of the window object
