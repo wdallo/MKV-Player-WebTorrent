@@ -165,86 +165,11 @@
     </footer>
 
     <script src="../libs/plyr.polyfilled-min.js"></script>
-    <script type="module">
-      // Import the VideoPlayerController class
-      import { VideoPlayerController } from "../libs/player.js";
-
-      // Initialize the application with error handling
-      document.addEventListener("DOMContentLoaded", async () => {
-        // Apply Electron fullscreen layout if in Electron
-        if (window.electronAPI) {
-          document.body.classList.add("electron-app"); // Add Electron-specific stylesheet
-          const electronStyle = document.createElement("link");
-          electronStyle.rel = "stylesheet";
-          electronStyle.href = "/libs/styles/electron-min.css";
-          document.head.appendChild(electronStyle);
-        }
-
-        try {
-          const magnetUrl = decodeURIComponent(
-            "<%- encodeURIComponent(magnet) %>",
-          );
-
-          if (!magnetUrl) {
-            console.error("No magnet URL provided");
-            return;
-          }
-
-          console.log("Initializing player with magnet:", magnetUrl);
-
-          // Initialize player - it will use its own overlay manager
-          const player = new VideoPlayerController(magnetUrl);
-          window.player = player;
-          await player.initialize();
-        } catch (error) {
-          console.error("❌ Failed to initialize player:", error);
-        }
-      });
-    </script>
-
-    <!-- Fallback error handler for ES6 module loading issues -->
-    <script>
-      window.addEventListener("error", function (e) {
-        if (e.message && e.message.includes("module")) {
-          console.error("ES6 Module Loading Error:", e);
-          const overlay = document.getElementById("plyr-loading-overlay");
-          if (overlay) {
-            // Clear existing content safely
-            overlay.textContent = "";
-
-            // Create error container
-            const errorContainer = document.createElement("div");
-            errorContainer.style.textAlign = "center";
-            errorContainer.style.color = "#fff";
-            errorContainer.style.padding = "20px";
-
-            // Create icon
-            const iconDiv = document.createElement("div");
-            iconDiv.textContent = "⚠️";
-            iconDiv.style.fontSize = "3em";
-            iconDiv.style.marginBottom = "10px";
-
-            // Create title
-            const titleDiv = document.createElement("div");
-            titleDiv.textContent = "Module Loading Error";
-            titleDiv.style.fontSize = "1.2em";
-            titleDiv.style.marginBottom = "10px";
-
-            // Create description
-            const descDiv = document.createElement("div");
-            descDiv.textContent =
-              "Please refresh the page or try a different browser that supports ES6 modules.";
-            descDiv.style.fontSize = "0.9em";
-            descDiv.style.opacity = "0.8";
-
-            // Assemble the error display
-            errorContainer.appendChild(iconDiv);
-            errorContainer.appendChild(titleDiv);
-            errorContainer.appendChild(descDiv);
-            overlay.appendChild(errorContainer);
-          }
-        }
-      });
+     <script 
+      type="module" 
+      id="player-core-loader-script" 
+      data-magnet="<%- encodeURIComponent(magnet) %>" 
+      src="../libs/playerLoader-min.js">
     </script>
   </body>
 </html>
