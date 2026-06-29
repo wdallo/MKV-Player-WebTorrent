@@ -10,10 +10,97 @@ import {
 import { fileURLToPath } from "url";
 import path from "path";
 import { spawn } from "child_process";
+
+import contextMenu from "electron-context-menu";
+
+contextMenu({
+  showLookUpSelection: false,
+  showSearchWithGoogle: false,
+  showInspectElement: false,
+  showCopyImage: false,
+  showCopyLink: false,
+  showSelectAll: false,
+  shouldShowMenu: (event, params) => params.isEditable,
+});
+
 process.env.APP_VERSION = app.getVersion();
 // Support __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Function to inject a clean error screen directly into your view component
+function injectWebviewError(viewInstance) {
+  // Simple, universal modern HTML structure matching your app's dark aesthetic
+  const errorHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Connection Failed</title>
+      <style>
+        body {
+          background-color: #121212;
+          color: #ffffff;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          margin: 0;
+          text-align: center;
+          padding: 20px;
+          box-sizing: border-box;
+        }
+        .container {
+          max-width: 500px;
+        }
+        h1 {
+          font-size: 24px;
+          margin-bottom: 12px;
+          color: #ff4d4f;
+          font-weight: 600;
+        }
+        p {
+          font-size: 15px;
+          color: #a0a0a0;
+          line-height: 1.6;
+          margin-bottom: 24px;
+        }
+        .retry-btn {
+          background-color: #0091ff;
+          color: white;
+          border: none;
+          padding: 10px 24px;
+          font-size: 14px;
+          font-weight: 500;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+        .retry-btn:hover {
+          background-color: #007be6;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Connection Failed</h1>
+        <p>The domain name could not be resolved. The page does not exist or is not responding. Please check your spelling or internet settings.</p>
+        <button class="retry-btn" onclick="window.location.reload()">Retry Connection</button>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Encode the markup cleanly to feed it directly as a virtual application URL
+  const encodedHtml = Buffer.from(errorHtml).toString("base64");
+
+  if (viewInstance && viewInstance.webContents) {
+    viewInstance.webContents.loadURL(`data:text/html;base64,${encodedHtml}`);
+  }
+}
+
 /// Override console.error to filter out Electron internal GUEST_VIEW and navigation errors noise
 const originalConsoleError = console.error;
 
@@ -35,6 +122,21 @@ console.error = function (...args) {
     ) ||
     errorMessage.includes("rejectAndCleanup") ||
     errorMessage.includes("thepiratebay.org");
+
+  // FILTER [3]:
+  // Catch exact domain resolution failures (ERR_NAME_NOT_RESOLVED / -105)
+  const isDnsFailure =
+    errorMessage.includes("ERR_NAME_NOT_RESOLVED") ||
+    errorMessage.includes("-105");
+  if (isDnsFailure) {
+    // Trigger the custom error UI block immediately
+    dialog.showErrorBox(
+      "Connection Failed",
+      "The domain name could not be resolved. The page does not exist or is not responding.",
+    );
+    // Suppress from printing to the terminal to keep logs pristine
+    return;
+  }
   if (isGuestViewAbort || isNativeNavigationFailure) {
     // Intentionally silence these exact native internal navigation errors to keep terminal logs pristine
     return;
@@ -46,6 +148,20 @@ console.error = function (...args) {
 process.on("unhandledRejection", (reason) => {
   if (reason) {
     const reasonStr = String(reason);
+    // Check for DNS failure variations inside promises as well
+    const isDnsFailure =
+      reason.code === "ERR_NAME_NOT_RESOLVED" ||
+      reason.errno === -105 ||
+      reasonStr.includes("ERR_NAME_NOT_RESOLVED") ||
+      reasonStr.includes("-105");
+
+    if (isDnsFailure) {
+      dialog.showErrorBox(
+        "Connection Failed",
+        "The domain name could not be resolved. The page does not exist or is not responding.",
+      );
+      return;
+    }
 
     // Check all possible variations of the Chromium cancellation and failure error properties
     const isNetworkCancel =
