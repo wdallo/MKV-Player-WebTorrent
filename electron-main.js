@@ -28,9 +28,15 @@ process.env.APP_VERSION = app.getVersion();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Function to inject a clean error screen directly into your view component
-function injectWebviewError(viewInstance) {
-  // Simple, universal modern HTML structure matching your app's dark aesthetic
+/**
+ * Injects a dark-themed network error page directly into the frontend <webview>
+ * @param {BrowserWindow} windowInstance - The main Electron window object
+ */
+function injectWebviewErrorPage(windowInstance) {
+  // Check if the window exists, is initialized, and its webContents are alive
+  if (!windowInstance || !windowInstance.webContents) return;
+
+  // Custom dark-themed HTML layout coded directly into a safe template string
   const errorHtml = `
     <!DOCTYPE html>
     <html>
@@ -39,9 +45,8 @@ function injectWebviewError(viewInstance) {
       <title>Connection Failed</title>
       <style>
         body {
-          background-color: #121212;
           color: #ffffff;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -52,53 +57,44 @@ function injectWebviewError(viewInstance) {
           padding: 20px;
           box-sizing: border-box;
         }
-        .container {
-          max-width: 500px;
-        }
-        h1 {
-          font-size: 24px;
-          margin-bottom: 12px;
-          color: #ff4d4f;
-          font-weight: 600;
-        }
-        p {
-          font-size: 15px;
-          color: #a0a0a0;
-          line-height: 1.6;
-          margin-bottom: 24px;
-        }
-        .retry-btn {
-          background-color: #0091ff;
-          color: white;
-          border: none;
-          padding: 10px 24px;
-          font-size: 14px;
-          font-weight: 500;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        .retry-btn:hover {
-          background-color: #007be6;
-        }
+        h1 { font-size: 24px; margin-bottom: 12px; color: #ff4d4f; font-weight: 600; }
+        p { font-size: 15px; color: #a0a0a0; line-height: 1.6; margin-bottom: 24px; max-width: 500px; }
+      
       </style>
     </head>
     <body>
       <div class="container">
         <h1>Connection Failed</h1>
         <p>The domain name could not be resolved. The page does not exist or is not responding. Please check your spelling or internet settings.</p>
-        <button class="retry-btn" onclick="window.location.reload()">Retry Connection</button>
+
       </div>
     </body>
     </html>
   `;
 
-  // Encode the markup cleanly to feed it directly as a virtual application URL
+  // Encode the html to a base64 data string cleanly inside the node backend
   const encodedHtml = Buffer.from(errorHtml).toString("base64");
+  const dataUrl = `data:text/html;base64,${encodedHtml}`;
 
-  if (viewInstance && viewInstance.webContents) {
-    viewInstance.webContents.loadURL(`data:text/html;base64,${encodedHtml}`);
-  }
+  // Safely force inject client-side script manipulation directly into your frontend window layout
+  windowInstance.webContents
+    .executeJavaScript(
+      `
+    (function() {
+      const webview = document.getElementById("browser-webview");
+      if (webview) {
+        // Hide any loaders that might still be active on your UI
+        const loader = document.getElementById("browser-loading");
+        if (loader) loader.style.display = "none";
+        webview.style.pointerEvents = "auto";
+        
+        // Force render the encoded error UI structure straight inside your webview frame context
+        webview.src = "${dataUrl}";
+      }
+    })();
+  `,
+    )
+    .catch((err) => console.log("Failed to execute code on UI frame:", err));
 }
 
 /// Override console.error to filter out Electron internal GUEST_VIEW and navigation errors noise
@@ -129,13 +125,8 @@ console.error = function (...args) {
     errorMessage.includes("ERR_NAME_NOT_RESOLVED") ||
     errorMessage.includes("-105");
   if (isDnsFailure) {
-    // Trigger the custom error UI block immediately
-    dialog.showErrorBox(
-      "Connection Failed",
-      "The domain name could not be resolved. The page does not exist or is not responding.",
-    );
-    // Suppress from printing to the terminal to keep logs pristine
-    return;
+    injectWebviewErrorPage(mainWindow);
+    return; // Suppress from printing to the terminal
   }
   if (isGuestViewAbort || isNativeNavigationFailure) {
     // Intentionally silence these exact native internal navigation errors to keep terminal logs pristine
@@ -156,11 +147,8 @@ process.on("unhandledRejection", (reason) => {
       reasonStr.includes("-105");
 
     if (isDnsFailure) {
-      dialog.showErrorBox(
-        "Connection Failed",
-        "The domain name could not be resolved. The page does not exist or is not responding.",
-      );
-      return;
+      injectWebviewErrorPage(mainWindow);
+      return; // Suppress from printing to the terminal
     }
 
     // Check all possible variations of the Chromium cancellation and failure error properties
