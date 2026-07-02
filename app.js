@@ -256,6 +256,4 @@ if (isMainModule) {
   startServer();
 }
 
-// Export for testing
 export { createApp, startServer };
-export default createApp;
